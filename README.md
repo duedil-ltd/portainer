@@ -1,4 +1,4 @@
-ddocker
-=======
+Distributed Docker
+==================
 
-Build docker images on a Mesos Cluster
+Build and launch docker images on an [Apache Mesos](mesos.apache.org) Cluster.

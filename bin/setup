@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+function check_deps() {
+    missing=
+    while [ $1 ]; do
+      if [ ! $(which $1) ]; then
+        echo Could not find $1.
+        missing=1
+      fi
+      shift
+    done
+    if [ $missing ]; then
+      echo Not all dependencies found on PATH. Aborting.
+      exit 1
+    fi
+}
+
+check_deps python2.7 virtualenv
+BASEDIR=$(dirname $0)/..
+
+# Install the requirements
+if [ ! -f "$BASEDIR/bin/env/updated" -o $BASEDIR/requirements.pip -nt $BASEDIR/bin/env/updated ]; then
+  virtualenv $BASEDIR/bin/env -p python2.7
+  $BASEDIR/bin/env/bin/pip install -U distribute==0.6.46
+  $BASEDIR/bin/env/bin/pip install -r $BASEDIR/requirements.pip
+  if [ $? -ne 0 ]; then
+    echo "There was a problem installing requirements. Aborting."
+    exit 1
+  fi
+
+  echo Base requirements installed.
+  touch $BASEDIR/bin/env/updated
+fi

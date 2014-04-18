@@ -25,6 +25,8 @@ def main(argv):
                                                   "to re-attach to a running "
                                                   "container or building image "
                                                   "in case of an accidental ^C")
+    group.add_argument("--framework-id", default=None,
+                       help="Custom framework identifier, defaults to a UUID")
 
     args = parser.parse_args(argv)
 

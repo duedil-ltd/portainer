@@ -1,0 +1,28 @@
+
+package ddocker;
+
+/**
+ * Representation of a docker image
+ */
+message DockerImage {
+  required DockerNamespace repository = 1;
+  required DockerRepository repository = 2;
+
+  repeated string tag = 3;
+}
+
+message DockerNamespace {
+  required string name = 1;
+}
+
+message DockerRepository {
+  required string name = 1;
+}
+
+/**
+ * Configuration for a docker registry
+ */
+message DockerRegistry {
+  required string hostname = 1;
+  required uint32 port = 2;
+}

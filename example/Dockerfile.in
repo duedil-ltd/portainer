@@ -1,0 +1,9 @@
+#
+# Example Dockerfile template to build a docker image with ddocker installed
+# into /opt/ddocker.
+#
+
+FROM ubuntu:12.04
+MAINTAINER Tom Arnfeld <tom@duedil.com>
+
+ADD ../ /opt/ddocker

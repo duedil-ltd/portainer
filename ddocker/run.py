@@ -1,6 +1,0 @@
-"""
-"""
-
-
-def main(args):
-    pass

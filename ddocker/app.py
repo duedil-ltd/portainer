@@ -1,21 +1,16 @@
 """
 """
 
-import argparse
-from ddocker.build import main as command_build
-from ddocker.run import main as command_run
+from ddocker import parser
+
+# Import all the commands
+import ddocker.command.build
+import ddocker.command.run
 
 
 def main(argv):
 
-    parser = argparse.ArgumentParser(
-        prog="ddocker",
-        fromfile_prefix_chars="@"
-    )
-
-    parser.add_argument("command", help="Command to run [build,run]")
-
-    # Mesos
+    # Arguments for mesos
     group = parser.add_argument_group("mesos")
     group.add_argument("--mesos-master", default="127.0.0.1:5050",
                        help="Mesos master address")
@@ -28,14 +23,8 @@ def main(argv):
     group.add_argument("--framework-id", default=None,
                        help="Custom framework identifier, defaults to a UUID")
 
+    # Arguments for S3/HDFS
+    # TODO
+
     args = parser.parse_args(argv)
-
-    commands = {
-        "build": command_build,
-        "run": command_run
-    }
-
-    if args.command not in commands:
-        raise NotImplementedError("Command %s is not valid" % args.command)
-
-    commands[args.command](args)
+    args._fn(args)

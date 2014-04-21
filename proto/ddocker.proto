@@ -2,10 +2,17 @@
 package ddocker;
 
 /**
+ * Checkpoint used by ddocker to store the running state, should
+ */
+message Checkpoint {
+  required string frameworkId = 1;
+}
+
+/**
  * Representation of a docker image
  */
 message DockerImage {
-  required DockerNamespace repository = 1;
+  required DockerNamespace namespace = 1;
   required DockerRepository repository = 2;
 
   repeated string tag = 3;

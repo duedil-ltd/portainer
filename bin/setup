@@ -28,6 +28,9 @@ if [ ! -f "$BASEDIR/bin/env/updated" -o $BASEDIR/requirements.pip -nt $BASEDIR/b
     exit 1
   fi
 
+  # Install the eggs
+  $BASEDIR/bin/env/bin/easy_install $BASEDIR/eggs/*.egg
+
   echo Base requirements installed.
   touch $BASEDIR/bin/env/updated
 fi

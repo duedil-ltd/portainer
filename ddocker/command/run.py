@@ -1,7 +1,11 @@
 """
 """
 
+import logging
 from ddocker import subcommand
+
+
+logger = logging.getLogger("ddocker.build")
 
 
 def args(parser):

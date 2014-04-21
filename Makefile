@@ -16,10 +16,15 @@ clean-py:
 	find ./ddocker -name "*.py[co]" -exec rm {} \;
 	@echo "\033[32m✔\033[39m Deleting python compiled files."
 
+clean-proto:
+	@echo "\033[34m●\033[39m Deleting python proto modules."
+	rm-rf ./ddocker/proto
+	@echo "\033[32m✔\033[39m Deleting python proto modules."
+
 protobuf:
 	@echo "\033[34m●\033[39m Building python proto modules."
-	protoc proto/*.proto --python_out=ddocker/
-	touch ddocker/proto/__init__.py
+	protoc ./proto/*.proto --python_out=./ddocker/
+	touch ./ddocker/proto/__init__.py
 	@echo "\033[32m✔\033[39m Building python proto modules."
 
 dist-cli:

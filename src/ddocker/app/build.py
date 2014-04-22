@@ -40,9 +40,9 @@ def args(parser):
     group = parser.add_argument_group("fs")
     group.add_argument("--staging-uri", default="/tmp/ddocker",
                        help="The URI to use as a base directory for staging files.")
-    group.add_argument("--s3-access-key", default=os.environ.get("AWS_ACCESS_KEY_ID"),
+    group.add_argument("--aws-access-key-id", default=os.environ.get("AWS_ACCESS_KEY_ID"),
                        help="Access key for using the S3 filesystem")
-    group.add_argument("--s3-secret-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+    group.add_argument("--aws-secret-access-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY"),
                        help="Secret key for using the S3 filesystem")
 
 

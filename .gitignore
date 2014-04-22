@@ -53,6 +53,3 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
-
-# Generator Profobufs
-ddocker/proto

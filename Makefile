@@ -1,38 +1,33 @@
 all::	clean build
 build::	protobuf dist
-dist::	dist-cli dist-executor
+dist::	dist-app dist-executor
 clean::	clean-py clean-proto clean-dist
 
 DOT := \033[34m●\033[39m
 TICK := \033[32m✔\033[39m
 
+PYTHON_REQ := CPython>=2.7,<3
+
 clean-py:
-	@echo "$(DOT) Deleting python compiled files."
-	find ./ddocker -name "*.py[co]" -exec rm {} \;
-	@echo "$(TICK) Deleting python compiled files."
+	find ./src/ddocker -name "*.py[co]" -exec rm {} \;
 
 clean-proto:
-	@echo "$(DOT) Deleting python proto modules."
-	rm -rf ./ddocker/proto
-	@echo "$(TICK) Deleting python proto modules."
+	rm -rf ./src/ddocker/proto/*_pb2.py
 
 clean-dist:
-	@echo "$(DOT) Deleting distribution files."
-	rm -rf ./dist build ddocker.egg-info
-	@echo "$(TICK) Deleting distribution files."
+	rm -rf ./dist
 
 protobuf: clean-proto
 	@echo "$(DOT) Building python proto modules."
-	protoc ./proto/*.proto --python_out=./ddocker/
-	touch ./ddocker/proto/__init__.py
+	protoc ./proto/*.proto --python_out=./src/ddocker/
 	@echo "$(TICK) Building python proto modules."
 
-dist-cli: protobuf
+dist-app: protobuf
 	@echo "$(DOT) Building ddocker distribution binary."
-	./pants ddocker:cli
+	./bin/pants build -i '$(PYTHON_REQ)' src/ddocker/app:ddocker
 	@echo "$(TICK) Building ddocker distribution binary."
 
 dist-executor: protobuf
 	@echo "$(DOT) Building ddocker executor."
-	./pants ddocker:executor
+	./bin/pants build -i '$(PYTHON_REQ)' src/ddocker/executor:ddocker_executor
 	@echo "$(TICK) Building ddocker executor."

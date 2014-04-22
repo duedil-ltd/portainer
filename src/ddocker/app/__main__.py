@@ -4,11 +4,11 @@
 import logging
 import sys
 
-from ddocker import parser
+from ddocker.app import parser
 
 # Import all the commands
-import ddocker.command.build
-import ddocker.command.run
+import ddocker.app.build
+import ddocker.app.run
 
 
 def main(argv):

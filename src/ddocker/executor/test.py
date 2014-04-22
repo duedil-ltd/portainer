@@ -1,0 +1,3 @@
+
+def foo():
+    print "testing"

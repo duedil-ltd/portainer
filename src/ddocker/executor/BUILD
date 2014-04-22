@@ -3,7 +3,10 @@ python_library(
     name = 'executor',
     sources = globs("*.py"),
     dependencies = [
-        pants('ddocker/util')
+        pants('third_party:mesos'),
+        pants('third_party:docker-py'),
+        pants('src/ddocker/util'),
+        pants('src/ddocker/proto')
     ]
 )
 
@@ -12,5 +15,5 @@ python_binary(
     dependencies = [
         pants(':executor')
     ],
-    entry_point = 'ddocker.executor'
+    entry_point = 'ddocker.executor.__main__'
 )

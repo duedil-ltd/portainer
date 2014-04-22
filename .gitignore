@@ -20,6 +20,9 @@ var/
 third_party/*.egg
 *.egg-info
 .pants*
+*.pex
+bin/virtualenv-*
+.venv
 
 # Installer logs
 pip-log.txt

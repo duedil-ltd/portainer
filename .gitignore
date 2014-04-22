@@ -18,6 +18,7 @@ sdist/
 var/
 .installed.cfg
 eggs/*.egg
+*.egg-info
 
 # Installer logs
 pip-log.txt

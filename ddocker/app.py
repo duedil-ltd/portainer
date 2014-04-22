@@ -15,7 +15,7 @@ def main(argv):
 
     # Arguments for mesos
     group = parser.add_argument_group("mesos")
-    group.add_argument("--verbose -v", default=False, action="store_true", dest="verbose",
+    group.add_argument("--verbose", "-v", default=False, action="store_true", dest="verbose",
                        help="Enable verbose logging")
     group.add_argument("--mesos-master", default="127.0.0.1:5050",
                        help="Mesos master address")

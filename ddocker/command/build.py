@@ -1,6 +1,7 @@
 """
 """
 
+import functools
 import logging
 import mesos
 import os
@@ -9,6 +10,7 @@ import StringIO
 import tarfile
 import tempfile
 import threading
+import time
 import uuid
 
 from fs.osfs import OSFS
@@ -25,7 +27,14 @@ logger = logging.getLogger("ddocker.build")
 
 
 def args(parser):
-    parser.add_argument("dockerfile")
+    parser.add_argument("dockerfile", action="append")
+
+    # Isolation
+    group = parser.add_argument_group("isolation")
+    group.add_argument("--cpu-limit", default=1.0,
+                       help="CPU allocated to building the image")
+    group.add_argument("--mem-limit", default=256,
+                       help="Memory allocated to building the image (mb)")
 
     # Arguments for the staging filesystem
     group = parser.add_argument_group("fs")
@@ -65,67 +74,34 @@ def main(args):
             framework.id.value = checkpoint.frameworkId
 
     # Kick off the scheduler driver
-    scheduler = Scheduler(task_queue, args.checkpoint)
+    scheduler = Scheduler(
+        task_queue,
+        args.checkpoint,
+        args.cpu_limit,
+        args.mem_limit,
+        args
+    )
     driver = mesos.MesosSchedulerDriver(
         scheduler, framework, args.mesos_master
     )
+
+    # Put the task onto the queue
+    for dockerfile in args.dockerfile:
+        task_queue.put(dockerfile)
 
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)
     thread.start()
 
-    # Parse the dockerfile
-    dockerfile = parse_dockerfile(args.dockerfile)
-
-    # Generate the dockerfile build context
-    _, context_path = tempfile.mkstemp()
-    context = open(context_path, "w+b")
-
-    logger.debug("Writing context tar to %s", context_path)
-
-    context_root = os.path.abspath(os.path.dirname(args.dockerfile))
-    context_size = make_build_context(context, context_root, dockerfile)
-
-    # Upload the build context to the staging filesystem
-    filesystem = create_filesystem(
-        staging_uri=args.staging_uri,
-        s3_key=args.s3_access_key,
-        s3_secret=args.s3_secret_key
-    )
-
-    staging_file = "%s.tar.gz" % uuid.uuid1()
-    staging_uri = os.path.join(args.staging_uri, staging_file)
-
-    logger.info("Uploading context to %s (%r bytes)", staging_uri, context_size)
-
-    # Create a progress bar
-    pbar = progressbar.ProgressBar(maxval=context_size)
-    event = filesystem.setcontents_async(
-        path=staging_file,
-        data=context,
-        progress_callback=pbar.update,
-        finished_callback=pbar.finish
-    )
-
-    # Wait for the file to upload...
-    event.wait()
-
-    # Close and clear up the tmp context
-    logger.info("Cleaning up local context %s", context_path)
-    context.close()
-    os.unlink(context_path)
-
-    # Create a mesos task and ship it to the framework
-        # Download the tar to the sandbox
-        # POST /build (stdin = the tar)
-        # Tag and push the image
-    # Return and BAM. DONE.
-
-    # thread.join(20)
+    # Wait here until the tasks are done
+    while thread.isAlive():
+        time.sleep(0.5)
 
 
 def make_build_context(output, context_root, dockerfile):
     """Generate and return a compressed tar archive of the build context."""
+
+    dockerfile = parse_dockerfile(dockerfile)
 
     tar = tarfile.open(mode="w:gz", fileobj=output)
     for idx, (cmd, instruction) in enumerate(dockerfile.instructions):
@@ -192,14 +168,95 @@ def create_filesystem(staging_uri, s3_key, s3_secret):
 
 
 class Scheduler(mesos.Scheduler):
+    """Mesos scheduler that is responsible for launching the builder tasks."""
 
-    def __init__(self, task_queue, checkpoint):
+    def __init__(self, task_queue, checkpoint, cpu_limit, mem_limit, args):
         self.task_queue = task_queue
         self.checkpoint_path = checkpoint
+        self.cpu = cpu_limit
+        self.mem = mem_limit
+        self.args = args
+
+        self.filesystem = create_filesystem(
+            staging_uri=self.args.staging_uri,
+            s3_key=self.args.s3_access_key,
+            s3_secret=self.args.s3_secret_key
+        )
 
     def registered(self, driver, frameworkId, masterInfo):
         logger.info("Framework registered with %s", frameworkId.value)
         self._checkpoint(frameworkId=frameworkId.value)
+
+    def resourceOffers(self, driver, offers):
+
+        if self.task_queue.empty():
+            return
+
+        logger.debug("Received %d offers", len(offers))
+
+        for offer in offers:
+            offer_cpu = 0.0
+            offer_mem = 0
+
+            for resource in offer.resources:
+                if resource.name == "cpus":
+                    offer_cpu = resource.scalar
+                if resource.name == "mem":
+                    offer_mem = resource.scalar
+
+            # Launch the task if applicable
+            if offer_cpu >= self.cpu and offer_mem >= self.mem:
+                dockerfile = self.task_queue.get()
+
+                thread = threading.Thread(
+                    target=functools.partial(self._launchTask, dockerfile, offer)
+                )
+
+                thread.setDaemon(True)
+                thread.start()
+            else:
+                logger.debug("Ignoring offer %r", offer)
+
+    def _launchTask(self, dockerfile, offer):
+
+        logger.info("Launching task to build %s", dockerfile)
+
+        # Generate the dockerfile build context
+        _, context_path = tempfile.mkstemp()
+        context = open(context_path, "w+b")
+
+        logger.debug("Writing context tar to %s", context_path)
+
+        context_root = os.path.abspath(os.path.dirname(dockerfile))
+        context_size = make_build_context(context, context_root, dockerfile)
+
+        # Generate a task ID
+        task_id = uuid.uuid1()
+
+        # Upload the build context to the staging filesystem
+        staging_file = "%s.tar.gz" % task_id
+        staging_uri = os.path.join(self.args.staging_uri, staging_file)
+
+        logger.info("Uploading context to %s (%d bytes)", staging_uri, context_size)
+
+        # Create a progress bar
+        pbar = progressbar.ProgressBar(maxval=context_size)
+        event = self.filesystem.setcontents_async(
+            path=staging_file,
+            data=context,
+            progress_callback=pbar.update,
+            finished_callback=pbar.finish
+        )
+
+        # Wait for the file to upload...
+        event.wait()
+
+        # Close and clear up the tmp context
+        logger.info("Cleaning up local context %s", context_path)
+        context.close()
+        os.unlink(context_path)
+
+        # Launch the mesos task!
 
     def _checkpoint(self, frameworkId=None):
         """Helper method for persisting checkpoint information."""

@@ -22,7 +22,7 @@ third_party/*.egg
 .pants*
 *.pex
 bin/virtualenv-*
-.venv
+*.venv
 
 # Installer logs
 pip-log.txt

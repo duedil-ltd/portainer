@@ -4,12 +4,18 @@
 import logging
 import mesos
 import os
+import progressbar
+import StringIO
+import tarfile
 import tempfile
 import threading
-import tarfile
-import StringIO
+import uuid
+
+from fs.osfs import OSFS
+from fs.s3fs import S3FS
 
 from Queue import Queue
+from urlparse import urlparse
 from ddocker import subcommand
 from ddocker.parser import parse_dockerfile
 from ddocker.proto import ddocker_pb2
@@ -20,6 +26,15 @@ logger = logging.getLogger("ddocker.build")
 
 def args(parser):
     parser.add_argument("dockerfile")
+
+    # Arguments for the staging filesystem
+    group = parser.add_argument_group("fs")
+    group.add_argument("--staging-uri", default="/tmp/ddocker",
+                       help="The URI to use as a base directory for staging files.")
+    group.add_argument("--s3-access-key", default=os.environ.get("AWS_ACCESS_KEY_ID"),
+                       help="Access key for using the S3 filesystem")
+    group.add_argument("--s3-secret-key", default=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+                       help="Secret key for using the S3 filesystem")
 
 
 @subcommand("build", callback=args)
@@ -64,25 +79,49 @@ def main(args):
 
     # Generate the dockerfile build context
     _, context_path = tempfile.mkstemp()
-    context = open(context_path, "w")
+    context = open(context_path, "w+b")
 
     logger.debug("Writing context tar to %s", context_path)
 
     context_root = os.path.abspath(os.path.dirname(args.dockerfile))
-    make_build_context(context, context_root, dockerfile)
+    context_size = make_build_context(context, context_root, dockerfile)
+
+    # Upload the build context to the staging filesystem
+    filesystem = create_filesystem(
+        staging_uri=args.staging_uri,
+        s3_key=args.s3_access_key,
+        s3_secret=args.s3_secret_key
+    )
+
+    staging_file = "%s.tar.gz" % uuid.uuid1()
+    staging_uri = os.path.join(args.staging_uri, staging_file)
+
+    logger.info("Uploading context to %s (%r bytes)", staging_uri, context_size)
+
+    # Create a progress bar
+    pbar = progressbar.ProgressBar(maxval=context_size)
+    event = filesystem.setcontents_async(
+        path=staging_file,
+        data=context,
+        progress_callback=pbar.update,
+        finished_callback=pbar.finish
+    )
+
+    # Wait for the file to upload...
+    event.wait()
 
     # Close and clear up the tmp context
+    logger.info("Cleaning up local context %s", context_path)
     context.close()
     os.unlink(context_path)
 
-    # Upload the build context to the shared filesystem
     # Create a mesos task and ship it to the framework
         # Download the tar to the sandbox
         # POST /build (stdin = the tar)
         # Tag and push the image
     # Return and BAM. DONE.
 
-    thread.join(2)
+    # thread.join(20)
 
 
 def make_build_context(output, context_root, dockerfile):
@@ -120,7 +159,36 @@ def make_build_context(output, context_root, dockerfile):
     tar.addfile(info, fileobj=buildfile)
 
     tar.close()
+    output.seek(0, os.SEEK_END)
+    tar_size = output.tell()
     output.seek(0)
+
+    return tar_size
+
+
+def create_filesystem(staging_uri, s3_key, s3_secret):
+    """Create an instance of a filesystem based on the URI"""
+
+    url = urlparse(staging_uri)
+
+    # Local filesystem
+    if not url.scheme:
+        return OSFS(
+            root_path=url.path,
+            create=True
+        )
+
+    # S3 filesystem
+    if url.scheme.lower() == "s3":
+        if not url.netloc:
+            raise Exception("You must specify a s3://bucket/ when using s3")
+        return S3FS(
+            bucket=url.netloc,
+            prefix=url.path,
+            aws_access_key=s3_key,
+            aws_secret_key=s3_secret,
+            key_sync_timeout=3
+        )
 
 
 class Scheduler(mesos.Scheduler):

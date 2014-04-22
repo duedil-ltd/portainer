@@ -28,9 +28,6 @@ def main(argv):
     group.add_argument("--framework-id", default=None,
                        help="Custom framework identifier, defaults to a UUID")
 
-    # Arguments for S3/HDFS
-    # TODO
-
     args = parser.parse_args(argv)
 
     # Configure the logging verbosity/handlers

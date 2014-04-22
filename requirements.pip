@@ -1,3 +1,5 @@
 protobuf==2.5.0
 docker-py==0.3.1
 fs==0.5.0
+boto==2.27.0
+progressbar==2.2

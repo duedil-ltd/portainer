@@ -1,36 +1,38 @@
-all::	clean setup build
+all::	clean build
 build::	protobuf dist
 dist::	dist-cli dist-executor
-clean::	clean-py clean-env
+clean::	clean-py clean-proto clean-dist
 
-setup:
-	@./bin/setup
-
-clean-env:
-	@echo "\033[34m●\033[39m Deleting virtual environment."
-	rm -rf ./bin/env
-	@echo "\033[32m✔\033[39m Deleting virtual environment."
+DOT := \033[34m●\033[39m
+TICK := \033[32m✔\033[39m
 
 clean-py:
-	@echo "\033[34m●\033[39m Deleting python compiled files."
+	@echo "$(DOT) Deleting python compiled files."
 	find ./ddocker -name "*.py[co]" -exec rm {} \;
-	@echo "\033[32m✔\033[39m Deleting python compiled files."
+	@echo "$(TICK) Deleting python compiled files."
 
 clean-proto:
-	@echo "\033[34m●\033[39m Deleting python proto modules."
-	rm-rf ./ddocker/proto
-	@echo "\033[32m✔\033[39m Deleting python proto modules."
+	@echo "$(DOT) Deleting python proto modules."
+	rm -rf ./ddocker/proto
+	@echo "$(TICK) Deleting python proto modules."
 
-protobuf:
-	@echo "\033[34m●\033[39m Building python proto modules."
+clean-dist:
+	@echo "$(DOT) Deleting distribution files."
+	rm -rf ./dist build ddocker.egg-info
+	@echo "$(TICK) Deleting distribution files."
+
+protobuf: clean-proto
+	@echo "$(DOT) Building python proto modules."
 	protoc ./proto/*.proto --python_out=./ddocker/
 	touch ./ddocker/proto/__init__.py
-	@echo "\033[32m✔\033[39m Building python proto modules."
+	@echo "$(TICK) Building python proto modules."
 
-dist-cli:
-	@echo "\033[34m●\033[39m Building ddocker distribution binary."
-	@echo "\033[32m✔\033[39m Building ddocker distribution binary."
+dist-cli: protobuf
+	@echo "$(DOT) Building ddocker distribution binary."
+	./pants ddocker:cli
+	@echo "$(TICK) Building ddocker distribution binary."
 
-dist-executor:
-	@echo "\033[34m●\033[39m Building ddocker executor."
-	@echo "\033[32m✔\033[39m Building ddocker executor."
+dist-executor: protobuf
+	@echo "$(DOT) Building ddocker executor."
+	./pants ddocker:executor
+	@echo "$(TICK) Building ddocker executor."

@@ -17,8 +17,9 @@ parts/
 sdist/
 var/
 .installed.cfg
-eggs/*.egg
+third_party/*.egg
 *.egg-info
+.pants*
 
 # Installer logs
 pip-log.txt

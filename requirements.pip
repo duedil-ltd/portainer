@@ -1,1 +1,2 @@
 protobuf==2.5.0
+docker-py==0.3.1

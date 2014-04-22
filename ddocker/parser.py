@@ -40,7 +40,7 @@ class Dockerfile(object):
 
     def add_instruction(self, instruction):
         parts = instruction.split(" ")
-        command = parts[0]
+        command = parts[0].upper()
         arguments = parts[1:]
 
         self.instructions.append((command, arguments))

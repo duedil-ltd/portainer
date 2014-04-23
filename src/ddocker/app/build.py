@@ -51,6 +51,9 @@ def main(args):
     framework.name = "ddocker"
     framework.failover_timeout = 300  # Timeout after 300 seconds
 
+    if args.framework_id:
+        framework.id.value = args.framework_id
+
     # Create the executor
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = "builder"

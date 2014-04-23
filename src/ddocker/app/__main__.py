@@ -21,12 +21,6 @@ def main(argv):
                        help="Enable verbose logging")
     group.add_argument("--mesos-master", default="127.0.0.1:5050",
                        help="Mesos master address")
-    group.add_argument("--checkpoint", default="/tmp/ddocker.checkpoint",
-                       help="File path to store the ddocker checkpoint in. The"
-                            "checkpoint allows you to re-connect to a building"
-                            "image or running container in case of ^C")
-    group.add_argument("--no-checkpoint", dest="checkpoint", action="store_false",
-                       help="Disable the framework checkpoint file")
     group.add_argument("--framework-id", default=None,
                        help="Custom framework identifier, defaults to a UUID")
 

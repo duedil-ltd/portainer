@@ -141,7 +141,7 @@ class Scheduler(mesos.Scheduler):
 
         # Upload the build context (+ fancy progress bar)
         logger.info("Uploading context (%d bytes)", context_size)
-        pbar = progressbar.ProgressBar(maxval=context_size)
+        pbar = progressbar.ProgressBar(maxval=context_size, term_width=100)
         event = self.filesystem.setcontents_async(
             path=staging_context_path,
             data=context,
@@ -210,7 +210,7 @@ class Scheduler(mesos.Scheduler):
         driver.launchTasks(offer.id, [task])
         self.running += 1
 
-    def _create_filesystem(staging_uri, s3_key, s3_secret):
+    def _create_filesystem(self, staging_uri, s3_key, s3_secret):
         """Create an instance of a filesystem based on the URI"""
 
         url = urlparse(staging_uri)

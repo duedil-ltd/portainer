@@ -2,29 +2,27 @@
 package ddocker;
 
 /**
- * Checkpoint used by ddocker to store the running state, should
+ * Provides the necessary values to build a docker image
+ *   image : The definition of the image to be built
+ *   context: Path to the build context tar file (relative to the task sandbox)
  */
-message Checkpoint {
-  required string frameworkId = 1;
+message BuildTask {
+    required DockerImage image = 1;
+    optional string context = 4;
 }
 
 /**
  * Representation of a docker image
  */
 message DockerImage {
-  required DockerRepository repository = 2;
-  optional DockerRegistry registry = 3;
+  message DockerRepository {
+    required string username = 1;
+    required string repo_name = 2;
+  }
 
-  repeated string tag = 5;
-}
-
-message DockerNamespace {
-  required string name = 1;
-}
-
-message DockerRepository {
-  required string username = 1;
-  required string repo_name = 2;
+  required DockerRepository repository = 1;
+  optional DockerRegistry registry = 2;
+  repeated string tag = 3;
 }
 
 /**

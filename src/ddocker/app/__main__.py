@@ -37,7 +37,7 @@ def main(argv):
     formatter = logging.Formatter(fmt="%(asctime)s[%(name)s] %(message)s")
     handler.setFormatter(formatter)
 
-    for logger in ("ddocker.build", "ddocker.executor"):
+    for logger in ("ddocker.build", "ddocker.scheduler", "ddocker.executor"):
         logger = logging.getLogger(logger)
         logger.addHandler(handler)
         logger.setLevel(

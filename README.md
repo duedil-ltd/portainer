@@ -1,7 +1,7 @@
 
 # ddocker [WIP]
 
-**Distributed Docker** is a handy CLI tool for building a docker container on an [Apache Mesos](mesos.apache.org) Cluster.
+**Distributed Docker** is a handy CLI tool for building a docker container on an [Apache Mesos](http://mesos.apache.org) Cluster.
 
 ## Building ddocker
 
@@ -13,9 +13,14 @@ You'll need to have the following dependencies installed to compile;
 - Protocol Buffers (`brew install protobuf`)
 - Automake
 
+#### Mesos Slave Dependencies
+
+- If you're using any current stable version of mesos, with standard isolation, you'll need to ensure `lxc-docker` is installed (but not required to be running) on each mesos slave.
+- If you happen to be running a mesos cluster with [Deimos](https://github.com/mesosphere/deimos), this tool should work right out of the box, automatically launching within a pre-built docker image (with docker installed). *Yo dawg.*
+
 ### Compiling with `make`
 
-Building ddocker is easy, it uses the [pants](pantsbuild.github.io) build system from Twitter, and compiles into encapsulated [Python Executables](pex.readthedocs.org).
+Building ddocker is easy, it uses the [pants](http://pantsbuild.github.io) build system from Twitter, and compiles into encapsulated [Python Executables](http://pex.readthedocs.org).
 
 ```shell
 $ make dist

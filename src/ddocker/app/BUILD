@@ -7,6 +7,7 @@ python_library(
         pants('third_party:boto'),
         pants('third_party:progressbar'),
         pants('third_party:mesos'),
+        pants('third_party:docker-py'),
         pants('src/ddocker/util'),
         pants('src/ddocker/proto')
     ]

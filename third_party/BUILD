@@ -3,7 +3,7 @@ python_requirement(name = 'protobuf',
                    requirement='protobuf==2.5.0')
 
 python_requirement(name = 'docker-py',
-                   requirement='docker-py==0.3.1')
+                   requirement='docker-py==0.3.1dev')
 
 python_requirement(name = 'fs',
                    requirement='fs==0.5.0')

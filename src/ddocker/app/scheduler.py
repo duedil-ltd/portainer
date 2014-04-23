@@ -52,6 +52,9 @@ class Scheduler(mesos.Scheduler):
         master = "http://%s:%s" % (host, masterInfo.port)
         logger.info("Framework re-registered to %s", master)
 
+    def slaveLost(self, driver, slaveId):
+        pass
+
     def resourceOffers(self, driver, offers):
         """Called when resource offers are sent from the mesos cluster."""
 
@@ -82,8 +85,6 @@ class Scheduler(mesos.Scheduler):
 
     def statusUpdate(self, driver, update):
         """Called when a status update is received from the mesos cluster."""
-
-        logger.debug("Received task status update")
 
         done = False
 
@@ -186,10 +187,10 @@ class Scheduler(mesos.Scheduler):
         task.name = "build"
         task.task_id.value = task_id
         task.slave_id.value = offer.slave_id.value
-        task.command.value = "_"  # Empty value to allow us to use command URIs below
+        # task.command.value = "pwd"  # Empty value to allow us to use command URIs below
 
-        uri = task.command.uris.add()
-        uri.value = os.path.join(self.args.staging_uri, staging_context_path)
+        # uri = task.command.uris.add()
+        # uri.value = os.path.join(self.args.staging_uri, staging_context_path)
 
         task.data = build_task.SerializeToString()
         task.executor.MergeFrom(self.executor)

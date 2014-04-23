@@ -56,7 +56,7 @@ def main(args):
     # Create the executor
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = "builder"
-    executor.command.value = "./%s executor" % os.path.basename(args.executor)
+    executor.command.value = "./%s build-executor" % os.path.basename(args.executor)
     executor.name = "Docker Build Executor"
     executor.source = "ddocker"
 

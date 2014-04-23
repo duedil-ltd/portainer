@@ -49,7 +49,6 @@ def main(args):
     framework = mesos_pb2.FrameworkInfo()
     framework.user = "root"
     framework.name = "ddocker"
-    framework.failover_timeout = 300  # Timeout after 300 seconds
 
     if args.framework_id:
         framework.id.value = args.framework_id

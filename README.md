@@ -1,7 +1,7 @@
 
 # ddocker [WIP]
 
-**Distributed Docker** is a handy CLI tool for building and running docker containers on an [Apache Mesos](mesos.apache.org) Cluster. The *running* aspect is aimed only at launching a single short-lived container to run a script/tool somewhere on the cluster.
+**Distributed Docker** is a handy CLI tool for building a docker container on an [Apache Mesos](mesos.apache.org) Cluster.
 
 ## Building ddocker
 
@@ -29,5 +29,4 @@ After building ddocker, the `pex` executable files in `dist/` are good to go, th
 
 ```shell
 $ ./dist/ddocker.pex build example/Dockerfile.in --staging-uri s3://my-bucket/ddocker
-...
 ```

@@ -1,6 +1,6 @@
 all::	clean build
 build::	protobuf dist
-dist::	dist-app dist-executor
+dist::	dist-app
 clean::	clean-py clean-proto clean-dist
 
 DOT := \033[34m●\033[39m
@@ -26,8 +26,3 @@ dist-app: protobuf
 	@echo "$(DOT) Building ddocker distribution binary."
 	./bin/pants build -i '$(PYTHON_REQ)' src/ddocker/app:ddocker
 	@echo "$(TICK) Building ddocker distribution binary."
-
-dist-executor: protobuf
-	@echo "$(DOT) Building ddocker executor."
-	./bin/pants build -i '$(PYTHON_REQ)' src/ddocker/executor:ddocker_executor
-	@echo "$(TICK) Building ddocker executor."

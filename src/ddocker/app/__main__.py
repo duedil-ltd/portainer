@@ -8,10 +8,12 @@ from ddocker.app import parser
 
 # Import all the commands
 import ddocker.app.build
-import ddocker.app.run
+import ddocker.app.executor
 
 
 def main(argv):
+
+    parser.prog = "ddocker"
 
     # Arguments for mesos
     group = parser.add_argument_group("mesos")
@@ -35,7 +37,7 @@ def main(argv):
     formatter = logging.Formatter(fmt="%(asctime)s[%(name)s] %(message)s")
     handler.setFormatter(formatter)
 
-    for logger in ("ddocker.build", "ddocker.run"):
+    for logger in ("ddocker.build", "ddocker.executor"):
         logger = logging.getLogger(logger)
         logger.addHandler(handler)
         logger.setLevel(

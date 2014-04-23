@@ -12,10 +12,10 @@ message Checkpoint {
  * Representation of a docker image
  */
 message DockerImage {
-  required DockerNamespace namespace = 1;
   required DockerRepository repository = 2;
+  optional DockerRegistry registry = 3;
 
-  repeated string tag = 3;
+  repeated string tag = 5;
 }
 
 message DockerNamespace {
@@ -23,7 +23,8 @@ message DockerNamespace {
 }
 
 message DockerRepository {
-  required string name = 1;
+  required string username = 1;
+  required string repo_name = 2;
 }
 
 /**

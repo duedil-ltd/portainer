@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='proto/ddocker.proto',
   package='ddocker',
-  serialized_pb='\n\x13proto/ddocker.proto\x12\x07\x64\x64ocker\"!\n\nCheckpoint\x12\x13\n\x0b\x66rameworkId\x18\x01 \x02(\t\"v\n\x0b\x44ockerImage\x12+\n\tnamespace\x18\x01 \x02(\x0b\x32\x18.ddocker.DockerNamespace\x12-\n\nrepository\x18\x02 \x02(\x0b\x32\x19.ddocker.DockerRepository\x12\x0b\n\x03tag\x18\x03 \x03(\t\"\x1f\n\x0f\x44ockerNamespace\x12\x0c\n\x04name\x18\x01 \x02(\t\" \n\x10\x44ockerRepository\x12\x0c\n\x04name\x18\x01 \x02(\t\"0\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x0c\n\x04port\x18\x02 \x02(\r')
+  serialized_pb='\n\x13proto/ddocker.proto\x12\x07\x64\x64ocker\"!\n\nCheckpoint\x12\x13\n\x0b\x66rameworkId\x18\x01 \x02(\t\"t\n\x0b\x44ockerImage\x12-\n\nrepository\x18\x02 \x02(\x0b\x32\x19.ddocker.DockerRepository\x12)\n\x08registry\x18\x03 \x01(\x0b\x32\x17.ddocker.DockerRegistry\x12\x0b\n\x03tag\x18\x05 \x03(\t\"\x1f\n\x0f\x44ockerNamespace\x12\x0c\n\x04name\x18\x01 \x02(\t\"7\n\x10\x44ockerRepository\x12\x10\n\x08username\x18\x01 \x02(\t\x12\x11\n\trepo_name\x18\x02 \x02(\t\"0\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x0c\n\x04port\x18\x02 \x02(\r')
 
 
 
@@ -54,22 +54,22 @@ _DOCKERIMAGE = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='namespace', full_name='ddocker.DockerImage.namespace', index=0,
-      number=1, type=11, cpp_type=10, label=2,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='repository', full_name='ddocker.DockerImage.repository', index=1,
+      name='repository', full_name='ddocker.DockerImage.repository', index=0,
       number=2, type=11, cpp_type=10, label=2,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
+      name='registry', full_name='ddocker.DockerImage.registry', index=1,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
       name='tag', full_name='ddocker.DockerImage.tag', index=2,
-      number=3, type=9, cpp_type=9, label=3,
+      number=5, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -84,7 +84,7 @@ _DOCKERIMAGE = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=67,
-  serialized_end=185,
+  serialized_end=183,
 )
 
 
@@ -111,8 +111,8 @@ _DOCKERNAMESPACE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=187,
-  serialized_end=218,
+  serialized_start=185,
+  serialized_end=216,
 )
 
 
@@ -124,8 +124,15 @@ _DOCKERREPOSITORY = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='name', full_name='ddocker.DockerRepository.name', index=0,
+      name='username', full_name='ddocker.DockerRepository.username', index=0,
       number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='repo_name', full_name='ddocker.DockerRepository.repo_name', index=1,
+      number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -139,8 +146,8 @@ _DOCKERREPOSITORY = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=220,
-  serialized_end=252,
+  serialized_start=218,
+  serialized_end=273,
 )
 
 
@@ -174,12 +181,12 @@ _DOCKERREGISTRY = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=254,
-  serialized_end=302,
+  serialized_start=275,
+  serialized_end=323,
 )
 
-_DOCKERIMAGE.fields_by_name['namespace'].message_type = _DOCKERNAMESPACE
 _DOCKERIMAGE.fields_by_name['repository'].message_type = _DOCKERREPOSITORY
+_DOCKERIMAGE.fields_by_name['registry'].message_type = _DOCKERREGISTRY
 DESCRIPTOR.message_types_by_name['Checkpoint'] = _CHECKPOINT
 DESCRIPTOR.message_types_by_name['DockerImage'] = _DOCKERIMAGE
 DESCRIPTOR.message_types_by_name['DockerNamespace'] = _DOCKERNAMESPACE

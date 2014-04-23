@@ -28,6 +28,8 @@ def parse_dockerfile(path):
 
 class Dockerfile(object):
 
+    INTERNAL = ["REGISTRY", "REPOSITORY", "TAG"]
+
     def __init__(self, lines=[]):
         self.instructions = []
 

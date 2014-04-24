@@ -53,22 +53,10 @@ def main(args):
     if args.framework_id:
         framework.id.value = args.framework_id
 
-    # Create the executor
-    executor = mesos_pb2.ExecutorInfo()
-    executor.executor_id.value = "builder"
-    executor.command.value = "./%s build-executor" % os.path.basename(args.executor)
-    executor.name = "Docker Build Executor"
-    executor.source = "ddocker"
-
-    # Configure the mesos executor with the ddocker executor uri
-    ddocker_executor = executor.command.uris.add()
-    ddocker_executor.value = args.executor
-    ddocker_executor.executable = True
-
     # Kick off the scheduler driver
     scheduler = Scheduler(
         task_queue,
-        executor,
+        args.executor,
         args.cpu_limit,
         args.mem_limit,
         args

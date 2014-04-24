@@ -24,9 +24,9 @@ logger = logging.getLogger("ddocker.scheduler")
 class Scheduler(mesos.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
-    def __init__(self, task_queue, executor, cpu_limit, mem_limit, args):
+    def __init__(self, task_queue, executor_uri, cpu_limit, mem_limit, args):
         self.task_queue = task_queue
-        self.executor = executor
+        self.executor_uri = executor_uri
         self.cpu = cpu_limit
         self.mem = mem_limit
         self.args = args
@@ -187,13 +187,24 @@ class Scheduler(mesos.Scheduler):
         task.name = "build"
         task.task_id.value = task_id
         task.slave_id.value = offer.slave_id.value
-        # task.command.value = "pwd"  # Empty value to allow us to use command URIs below
-
-        # uri = task.command.uris.add()
-        # uri.value = os.path.join(self.args.staging_uri, staging_context_path)
 
         task.data = build_task.SerializeToString()
-        task.executor.MergeFrom(self.executor)
+
+        # Create the executor
+        task.executor.executor_id.value = task_id
+        task.executor.command.value = "./%s build-executor" % os.path.basename(self.executor_uri)
+        task.executor.name = "Docker Build Executor"
+        task.executor.source = "ddocker"
+
+        # Configure the mesos executor with the ddocker executor uri
+        ddocker_executor = task.executor.command.uris.add()
+        ddocker_executor.value = self.executor_uri
+        ddocker_executor.executable = True
+
+        # Add the docker context
+        uri = task.executor.command.uris.add()
+        uri.value = os.path.join(self.args.staging_uri, staging_context_path)
+        uri.extract = False
 
         # Build up the resources
         cpu_resource = task.resources.add()

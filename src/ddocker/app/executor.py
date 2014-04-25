@@ -1,12 +1,15 @@
 """
 """
 
+import docker
 import functools
+import json
 import logging
 import mesos
 import os
 import sys
 import threading
+import re
 
 from ddocker.app import subcommand
 from ddocker.proto import mesos_pb2
@@ -45,10 +48,50 @@ class Executor(mesos.Executor):
     TASK_FAILED = mesos_pb2.TASK_FAILED
 
     def __init__(self):
-        pass
+        self.build_task = None
+
+        self.docker = None
+        self.docker_daemon = threading.Condition()
+        self.docker_daemon_up = False
 
     def registered(self, driver, executorInfo, frameworkInfo, slaveInfo):
-        pass
+
+        # Parse the build task object
+        try:
+            build_task = ddocker_pb2.BuildTask()
+            build_task.ParseFromString(executorInfo.data)
+        except Exception:
+            logger.error("Failed to parse BuildTask in ExecutorInfo.data")
+            raise
+
+        self.build_task = build_task
+
+        # Launch the docker daemon
+        def launch_docker_daemon():
+            self.docker_daemon.acquire()
+
+            if self.docker_daemon_up:
+                return
+
+            # Launch the subprocess
+            # self._fork_docker()
+            # Sleep for a second
+            import time
+            time.sleep(10)
+            # Test the REST API
+
+            self.docker = docker.Client()
+
+            self.docker_daemon.notifyAll()
+            self.docker_daemon.release()
+
+        if not build_task.HasField("docker_host"):
+            daemon_thread = threading.Thread(target=launch_docker_daemon)
+            daemon_thread.setDaemon(True)
+            daemon_thread.start()
+        else:
+            host = "http://%s/" % build_task.docker_host
+            self.docker = docker.Client(host)
 
     def disconnected(self, driver):
         pass
@@ -60,14 +103,6 @@ class Executor(mesos.Executor):
 
         logger.info("Launched task %s", taskInfo.task_id.value)
 
-        # Parse the build task object
-        try:
-            buildTask = ddocker_pb2.BuildTask()
-            buildTask.ParseFromString(taskInfo.data)
-        except Exception, e:
-            logger.error("Failed to parse build task data %r", e)
-            self._update(driver, taskInfo, self.TASK_FAILED)
-
         # Tell mesos that we're starting the task
         self._update(driver, taskInfo, self.TASK_STARTING)
 
@@ -76,7 +111,7 @@ class Executor(mesos.Executor):
             self._buildImage,
             driver,
             taskInfo,
-            buildTask
+            self.build_task
         ))
 
         thread.setDaemon(False)
@@ -98,6 +133,13 @@ class Executor(mesos.Executor):
     def _buildImage(self, driver, taskInfo, buildTask):
         """Build an image for the given buildTask."""
 
+        # Wait for the docker daemon to be ready
+        self.docker_daemon.acquire()
+        while not self.docker:
+            self.docker_daemon.wait()
+        self.docker_daemon.release()
+
+        # Now that docker is up, let's go and do stuff
         self._update(driver, taskInfo, self.TASK_RUNNING)
 
         try:
@@ -109,6 +151,48 @@ class Executor(mesos.Executor):
 
             if not os.path.exists(context_path):
                 raise Exception("Context %s does not exist" % (context_path))
+
+            # TODO(tarnfeld): Pull off the tag from the buildTask
+
+            with open(context_path, "r") as context:
+                build_request = self.docker.build(
+                    fileobj=context,
+                    custom_context=True,
+                    encoding="gzip",
+                    stream=True
+                )
+
+                for update in build_request:
+                    update = json.loads(update)
+                    message = "%s: %s" % (
+                        image_name,
+                        update["stream"].rstrip()
+                    )
+
+                    logger.info("Received update from docker: %s", update)
+                    driver.sendFrameworkMessage(message)
+
+            # Extract the newly created image ID
+            match = re.search(r'built (.*)$', message)
+            if not match:
+                raise Exception("Failed to match image ID from %r" % update)
+            image_id = match.group(1)
+
+            # Tag the image with all the required tags
+            tags = buildTask.image.tag or ["latest"]
+            for tag in tags:
+                try:
+                    self.docker.tag(
+                        image=image_id,
+                        repository=image_name,
+                        tag=tag,
+                        force=True
+                    )
+                    driver.sendFrameworkMessage(
+                        "%s:  ---> Tag %s with %s" % (image_name, image_id, tag)
+                    )
+                except Exception, e:
+                    raise e
 
             self._update(driver, taskInfo, self.TASK_FINISHED)
         except Exception, e:

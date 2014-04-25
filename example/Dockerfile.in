@@ -6,10 +6,8 @@
 REGISTRY my.registry:80
 REPOSITORY testing/foobar
 
-TAG tag-1
-TAG tag-2
-
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 
+WORKDIR /opt/ddocker
 ADD ../ /opt/ddocker

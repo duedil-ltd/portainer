@@ -16,7 +16,11 @@ logger = logging.getLogger("ddocker.build")
 
 
 def args(parser):
-    parser.add_argument("dockerfile", action="append")
+    parser.add_argument("dockerfile")
+    parser.add_argument("--tag", action="append", default=[], dest="tags",
+                        help="Multiple tags to apply to the image once built")
+    parser.add_argument("--no-test", action="store_false", default=True,
+                        help="Disable executing any TEST commands")
 
     parser.add_argument("--executor-uri", dest="executor", required=True,
                         help="URI to the ddocker executor for mesos")
@@ -66,8 +70,7 @@ def main(args):
     )
 
     # Put the task onto the queue
-    for dockerfile in args.dockerfile:
-        task_queue.put(dockerfile)
+    task_queue.put((args.dockerfile, args.tags))
 
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)

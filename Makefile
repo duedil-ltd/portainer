@@ -1,4 +1,4 @@
-all::	clean build
+all::	build
 build::	protobuf dist
 dist::	dist-app
 clean::	clean-py clean-proto clean-dist
@@ -15,6 +15,8 @@ clean-proto:
 	rm -rf ./src/ddocker/proto/*_pb2.py
 
 clean-dist:
+	rm -rf .pants.run
+	rm -rf .pants.d
 	rm -rf ./dist
 
 protobuf: clean-proto

@@ -76,7 +76,8 @@ class Scheduler(mesos.Scheduler):
             # Launch the task if applicable
             if offer_cpu >= self.cpu and offer_mem >= self.mem:
                 try:
-                    self._launchTask(driver, self.task_queue.get(), offer)
+                    dockerfile, tags = self.task_queue.get()
+                    self._launchTask(driver, dockerfile, tags, offer)
                 except Exception, e:
                     logger.error("Caught exception launching task %r", e)
                     self.task_queue.task_done()
@@ -111,7 +112,10 @@ class Scheduler(mesos.Scheduler):
         if self.running == 0 and self.task_queue.empty():
             driver.stop()
 
-    def _launchTask(self, driver, path, offer):
+    def frameworkMessage(self, driver, executorId, slaveId, message):
+        logger.info(message)
+
+    def _launchTask(self, driver, path, tags, offer):
         """Launch a given dockerfile build task atop the given mesos offer."""
 
         # Generate a task ID
@@ -162,6 +166,11 @@ class Scheduler(mesos.Scheduler):
         build_task = ddocker_pb2.BuildTask()
         build_task.context = context_filename
 
+        if self.args.docker_host:
+            build_task.docker_host = self.args.docker_host
+        if self.args.docker_args:
+            build_task.docker_args = self.args.docker_args
+
         # Pull out the repository from the dockerfile
         try:
             user, repo = dockerfile.get("REPOSITORY").next().pop().split("/")
@@ -179,8 +188,7 @@ class Scheduler(mesos.Scheduler):
         except StopIteration:
             raise KeyError("No REGISTRY found in %s" % path)
 
-        # Pull out the tags from the dockerfile
-        build_task.image.tag.extend(map(lambda t: t[0], dockerfile.get("TAG")))
+        build_task.image.tag.extend(tags)
 
         # Define the mesos task
         task = mesos_pb2.TaskInfo()
@@ -188,11 +196,15 @@ class Scheduler(mesos.Scheduler):
         task.task_id.value = task_id
         task.slave_id.value = offer.slave_id.value
 
-        task.data = build_task.SerializeToString()
-
         # Create the executor
+        args = ""
+        if self.args.verbose:
+            args += "-v"
+
         task.executor.executor_id.value = task_id
-        task.executor.command.value = "./%s build-executor" % os.path.basename(self.executor_uri)
+        task.executor.command.value = "./%s %s build-executor" % (
+            os.path.basename(self.executor_uri), args
+        )
         task.executor.name = "Docker Build Executor"
         task.executor.source = "ddocker"
 
@@ -205,6 +217,9 @@ class Scheduler(mesos.Scheduler):
         uri = task.executor.command.uris.add()
         uri.value = os.path.join(self.args.staging_uri, staging_context_path)
         uri.extract = False
+
+        task.data = build_task.SerializeToString()
+        task.executor.data = task.data
 
         # Build up the resources
         cpu_resource = task.resources.add()

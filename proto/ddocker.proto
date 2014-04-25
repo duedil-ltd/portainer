@@ -8,7 +8,11 @@ package ddocker;
  */
 message BuildTask {
     required DockerImage image = 1;
-    optional string context = 4;
+    optional string context = 2;
+
+    // These are used when launching/connecting to the docker daemon
+    optional string docker_host = 3;
+    optional string docker_args = 4;
 }
 
 /**

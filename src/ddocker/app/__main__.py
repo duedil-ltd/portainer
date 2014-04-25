@@ -23,6 +23,13 @@ def main(argv):
                        help="Mesos master address")
     group.add_argument("--framework-id", default=None,
                        help="Custom framework identifier, defaults to a UUID")
+    group.add_argument("--docker-host", default=None,
+                       help="Custom host[:port] for the docker daemon, if not "
+                            "specified a short-lived docker daemon will be "
+                            "launched for you automatically")
+    group.add_argument("--docker-args", default=None,
+                       help="When launching an ephemeral docker daemon, these "
+                            "arguments will be passed to the `docker -d` call")
 
     args = parser.parse_args(argv)
 

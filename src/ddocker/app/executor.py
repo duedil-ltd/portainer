@@ -108,7 +108,7 @@ class Executor(mesos.Executor):
 
         # Spawn another thread to run the task freeing up the executor
         thread = threading.Thread(target=functools.partial(
-            self._buildImage,
+            self._build_image,
             driver,
             taskInfo,
             self.build_task
@@ -130,7 +130,39 @@ class Executor(mesos.Executor):
         update.state = state
         driver.sendStatusUpdate(update)
 
-    def _buildImage(self, driver, taskInfo, buildTask):
+    def _wrap_docker_stream(self, stream):
+        """Wrapper to parse the different types of messages from the
+        Docker Remote API and spit them out in a friendly format."""
+
+        for msg in stream:
+            logger.info("Received update from docker: %s", msg.rstrip())
+
+            # Parse the message / handle any errors from docker
+            try:
+                update = json.loads(msg.rstrip())
+            except Exception, e:
+                logger.error("Caught exception parsing message %s %r", msg, e)
+            else:
+                if "error" in update:
+                    logger.error("Docker error: %s", update["error"])
+                    yield update["error"]
+                    raise Exception("Docker encountered an error")
+
+                friendly_message = None
+
+                if "stream" in update:
+                    friendly_message = update["stream"].rstrip()
+                if "status" in update:
+                    friendly_message = update["status"].rstrip()
+                    if "id" in update:
+                        friendly_message = "[%s] %s" % (update["id"], friendly_message)
+                    if "progress" in update:
+                        friendly_message += " (%s)" % update["progress"]
+
+                if friendly_message is not None:
+                    yield friendly_message
+
+    def _build_image(self, driver, taskInfo, buildTask):
         """Build an image for the given buildTask."""
 
         # Wait for the docker daemon to be ready
@@ -146,13 +178,23 @@ class Executor(mesos.Executor):
             sandbox_dir = os.getcwd()
             context_path = os.path.join(sandbox_dir, buildTask.context)
 
-            image_name = "%s/%s" % (buildTask.image.repository.username, buildTask.image.repository.repo_name)
+            registry_url = ""
+            if buildTask.image.HasField("registry"):
+                registry_url = buildTask.image.registry.hostname
+                if buildTask.image.registry.HasField("port"):
+                    registry_url += ":%d" % buildTask.image.registry.port
+                registry_url += "/"
+
+            image_name = "%s%s/%s" % (
+                registry_url,
+                buildTask.image.repository.username,
+                buildTask.image.repository.repo_name
+            )
+
             logger.info("Building image %s from context %s", image_name, context_path)
 
             if not os.path.exists(context_path):
                 raise Exception("Context %s does not exist" % (context_path))
-
-            # TODO(tarnfeld): Pull off the tag from the buildTask
 
             with open(context_path, "r") as context:
                 build_request = self.docker.build(
@@ -162,24 +204,20 @@ class Executor(mesos.Executor):
                     stream=True
                 )
 
-                for update in build_request:
-                    update = json.loads(update)
-                    message = "%s: %s" % (
-                        image_name,
-                        update["stream"].rstrip()
+                for message in self._wrap_docker_stream(build_request):
+                    driver.sendFrameworkMessage(
+                        "%s: %s" % (image_name, message)
                     )
-
-                    logger.info("Received update from docker: %s", update)
-                    driver.sendFrameworkMessage(message)
 
             # Extract the newly created image ID
             match = re.search(r'built (.*)$', message)
             if not match:
-                raise Exception("Failed to match image ID from %r" % update)
+                raise Exception("Failed to match image ID from %r" % message)
             image_id = match.group(1)
 
             # Tag the image with all the required tags
             tags = buildTask.image.tag or ["latest"]
+            driver.sendFrameworkMessage("%s: Tagging image %s" % (image_name, image_id))
             for tag in tags:
                 try:
                     self.docker.tag(
@@ -188,11 +226,17 @@ class Executor(mesos.Executor):
                         tag=tag,
                         force=True
                     )
-                    driver.sendFrameworkMessage(
-                        "%s:  ---> Tag %s with %s" % (image_name, image_id, tag)
-                    )
+                    driver.sendFrameworkMessage("%s:  ---> %s" % (image_name, tag))
                 except Exception, e:
                     raise e
+
+            # Push the image to the registry
+            driver.sendFrameworkMessage("%s: Pushing image" % image_name)
+            push_request = self.docker.push(image_name, stream=True)
+            for message in self._wrap_docker_stream(push_request):
+                driver.sendFrameworkMessage(
+                    "%s: %s" % (image_name, message)
+                )
 
             self._update(driver, taskInfo, self.TASK_FINISHED)
         except Exception, e:

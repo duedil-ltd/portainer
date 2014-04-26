@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='proto/ddocker.proto',
   package='ddocker',
-  serialized_pb='\n\x13proto/ddocker.proto\x12\x07\x64\x64ocker\"k\n\tBuildTask\x12#\n\x05image\x18\x01 \x02(\x0b\x32\x14.ddocker.DockerImage\x12\x0f\n\x07\x63ontext\x18\x02 \x01(\t\x12\x13\n\x0b\x64ocker_host\x18\x03 \x01(\t\x12\x13\n\x0b\x64ocker_args\x18\x04 \x01(\t\"\xb9\x01\n\x0b\x44ockerImage\x12\x39\n\nrepository\x18\x01 \x02(\x0b\x32%.ddocker.DockerImage.DockerRepository\x12)\n\x08registry\x18\x02 \x01(\x0b\x32\x17.ddocker.DockerRegistry\x12\x0b\n\x03tag\x18\x03 \x03(\t\x1a\x37\n\x10\x44ockerRepository\x12\x10\n\x08username\x18\x01 \x02(\t\x12\x11\n\trepo_name\x18\x02 \x02(\t\"0\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x0c\n\x04port\x18\x02 \x02(\r')
+  serialized_pb='\n\x13proto/ddocker.proto\x12\x07\x64\x64ocker\"k\n\tBuildTask\x12#\n\x05image\x18\x01 \x02(\x0b\x32\x14.ddocker.DockerImage\x12\x0f\n\x07\x63ontext\x18\x02 \x01(\t\x12\x13\n\x0b\x64ocker_host\x18\x03 \x01(\t\x12\x13\n\x0b\x64ocker_args\x18\x04 \x01(\t\"\xb9\x01\n\x0b\x44ockerImage\x12\x39\n\nrepository\x18\x01 \x02(\x0b\x32%.ddocker.DockerImage.DockerRepository\x12)\n\x08registry\x18\x02 \x01(\x0b\x32\x17.ddocker.DockerRegistry\x12\x0b\n\x03tag\x18\x03 \x03(\t\x1a\x37\n\x10\x44ockerRepository\x12\x10\n\x08username\x18\x01 \x02(\t\x12\x11\n\trepo_name\x18\x02 \x02(\t\"4\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x10\n\x04port\x18\x02 \x01(\r:\x02\x38\x30')
 
 
 
@@ -159,8 +159,8 @@ _DOCKERREGISTRY = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='port', full_name='ddocker.DockerRegistry.port', index=1,
-      number=2, type=13, cpp_type=3, label=2,
-      has_default_value=False, default_value=0,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=True, default_value=80,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -174,7 +174,7 @@ _DOCKERREGISTRY = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=329,
-  serialized_end=377,
+  serialized_end=381,
 )
 
 _BUILDTASK.fields_by_name['image'].message_type = _DOCKERIMAGE

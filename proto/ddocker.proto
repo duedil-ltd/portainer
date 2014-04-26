@@ -34,5 +34,5 @@ message DockerImage {
  */
 message DockerRegistry {
   required string hostname = 1;
-  required uint32 port = 2;
+  optional uint32 port = 2 [default = 80];
 }

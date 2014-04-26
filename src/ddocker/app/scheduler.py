@@ -89,6 +89,10 @@ class Scheduler(mesos.Scheduler):
 
         done = False
 
+        if update.state == mesos_pb2.TASK_STARTING:
+            logger.info("Task update %s : STARTING", update.task_id.value)
+        if update.state == mesos_pb2.TASK_RUNNING:
+            logger.info("Task update %s : RUNNING", update.task_id.value)
         if update.state == mesos_pb2.TASK_FAILED:
             logger.info("Task update %s : FAILED", update.task_id.value)
             done = True
@@ -113,7 +117,10 @@ class Scheduler(mesos.Scheduler):
             driver.stop()
 
     def frameworkMessage(self, driver, executorId, slaveId, message):
-        logger.info(message)
+        if "Buffering" in message:  # Heh. This'll do for now, eh?
+            logger.debug(message)
+        else:
+            logger.info(message)
 
     def _launchTask(self, driver, path, tags, offer):
         """Launch a given dockerfile build task atop the given mesos offer."""
@@ -158,7 +165,7 @@ class Scheduler(mesos.Scheduler):
         event.wait()
 
         # Close and clear up the tmp context
-        logger.info("Cleaning up local context %s", context_path)
+        logger.debug("Cleaning up local context %s", context_path)
         context.close()
         os.unlink(context_path)
 

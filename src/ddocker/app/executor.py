@@ -235,7 +235,7 @@ class Executor(mesos.Executor):
             push_request = self.docker.push(image_name, stream=True)
             for message in self._wrap_docker_stream(push_request):
                 driver.sendFrameworkMessage(
-                    "%s: %s" % (image_name, message)
+                    "%s:  ---> %s" % (image_name, message)
                 )
 
             self._update(driver, taskInfo, self.TASK_FINISHED)

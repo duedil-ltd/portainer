@@ -36,11 +36,10 @@ To enable mesos to build the image and interact with ddocker you'll need to uplo
 
 ### 2. Write your Dockerfile.in
 
-The dockerfiles used by ddocker are almost identical functionally to those used by docker itself. However, ddocker introduces three new build commands that are required, adding these **will not** cause the `Dockerfile` to be unusable with the standalone `docker build`, they will be skipped and ignored.
+The dockerfiles used by ddocker are almost identical functionally to those used by docker itself. However, ddocker introduces a couple of new build commands that are required, adding these **will not** cause the `Dockerfile` to be unusable with the standalone `docker build`, they will be skipped and ignored.
 
 - `REGISTRY` - The docker registry to push the image to once built
 - `REPOSITORY` - The name of the image repository (i.e `tarnfeld/ddocker`)
-- `TAG` - You can specify any number of `TAG` commands to tag the image with multiple tags
 
 ### 3. Launch ddocker
 

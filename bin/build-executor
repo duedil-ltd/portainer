@@ -38,6 +38,7 @@ pushd dist
 
         pushd build
             make clean
+            make protobuf
         popd
 
         mv build $TAR_NAME

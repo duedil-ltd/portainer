@@ -2,14 +2,14 @@
 """
 
 import logging
-import mesos
+import pesos.scheduler
 import os
 import threading
 import time
 
+from pesos.vendor.mesos import mesos_pb2
 from ddocker.app import subcommand
 from ddocker.app.scheduler import Scheduler
-from ddocker.proto import mesos_pb2
 from Queue import Queue
 
 logger = logging.getLogger("ddocker.build")
@@ -19,9 +19,6 @@ def args(parser):
     parser.add_argument("dockerfile")
     parser.add_argument("--tag", action="append", default=[], dest="tags",
                         help="Multiple tags to apply to the image once built")
-    parser.add_argument("--no-test", action="store_false", default=True,
-                        help="Disable executing any TEST commands")
-
     parser.add_argument("--executor-uri", dest="executor", required=True,
                         help="URI to the ddocker executor for mesos")
 
@@ -51,7 +48,7 @@ def main(args):
 
     # Launch the mesos framework
     framework = mesos_pb2.FrameworkInfo()
-    framework.user = "root"
+    framework.user = ""  # Let mesos fill this in
     framework.name = "ddocker"
 
     if args.framework_id:
@@ -65,7 +62,8 @@ def main(args):
         args.mem_limit,
         args
     )
-    driver = mesos.MesosSchedulerDriver(
+
+    driver = pesos.scheduler.MesosSchedulerDriver(
         scheduler, framework, args.mesos_master
     )
 

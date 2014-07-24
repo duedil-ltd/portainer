@@ -2,26 +2,28 @@
 """
 
 import logging
-import mesos
 import os
+import pesos.api
+import pesos.scheduler
 import progressbar
 import StringIO
 import tarfile
 import tempfile
+import threading
 import uuid
 
 from fs.osfs import OSFS
 from fs.s3fs import S3FS
 from urlparse import urlparse
+from pesos.vendor.mesos import mesos_pb2
 
 from ddocker.proto import ddocker_pb2
-from ddocker.proto import mesos_pb2
 from ddocker.util.parser import parse_dockerfile
 
 logger = logging.getLogger("ddocker.scheduler")
 
 
-class Scheduler(mesos.Scheduler):
+class Scheduler(pesos.api.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
     def __init__(self, task_queue, executor_uri, cpu_limit, mem_limit, args):
@@ -52,39 +54,45 @@ class Scheduler(mesos.Scheduler):
         master = "http://%s:%s" % (host, masterInfo.port)
         logger.info("Framework re-registered to %s", master)
 
-    def slaveLost(self, driver, slaveId):
-        pass
-
-    def resourceOffers(self, driver, offers):
+    def resource_offers(self, driver, offers):
         """Called when resource offers are sent from the mesos cluster."""
 
-        if self.task_queue.empty():
-            return
+        logger.info("Received %d offers from mesos", len(offers))
 
-        logger.debug("Received %d offers", len(offers))
+        # Spawn another thread to handle offer processing to free up the driver
+        def handle_offers():
+            for offer in offers:
+                offer_cpu = 0.0
+                offer_mem = 0
 
-        for offer in offers:
-            offer_cpu = 0.0
-            offer_mem = 0
+                if self.task_queue.empty():
+                    driver.decline_offer(offer.id)
+                    continue
 
-            for resource in offer.resources:
-                if resource.name == "cpus":
-                    offer_cpu = resource.scalar
-                if resource.name == "mem":
-                    offer_mem = resource.scalar
+                for resource in offer.resources:
+                    if resource.name == "cpus":
+                        offer_cpu = resource.scalar
+                    if resource.name == "mem":
+                        offer_mem = resource.scalar
 
-            # Launch the task if applicable
-            if offer_cpu >= self.cpu and offer_mem >= self.mem:
-                try:
-                    dockerfile, tags = self.task_queue.get()
-                    self._launchTask(driver, dockerfile, tags, offer)
-                except Exception, e:
-                    logger.error("Caught exception launching task %r", e)
-                    self.task_queue.task_done()
-            else:
-                logger.debug("Ignoring offer %r", offer)
+                # Launch the task if applicable
+                if offer_cpu >= self.cpu and offer_mem >= self.mem:
+                    try:
+                        dockerfile, tags = self.task_queue.get()
+                        self._launch_task(driver, dockerfile, tags, offer)
+                    except Exception, e:
+                        raise
+                        logger.error("Caught exception launching task %r", e)
+                        self.task_queue.task_done()
+                else:
+                    self.decline_offer(offer.id)
+                    logger.debug("Ignoring offer %r", offer)
 
-    def statusUpdate(self, driver, update):
+        t = threading.Thread(target=handle_offers)
+        t.setDaemon(True)
+        t.start()
+
+    def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""
 
         done = False
@@ -116,18 +124,18 @@ class Scheduler(mesos.Scheduler):
         if self.running == 0 and self.task_queue.empty():
             driver.stop()
 
-    def frameworkMessage(self, driver, executorId, slaveId, message):
+    def framework_message(self, driver, executorId, slaveId, message):
         if "Buffering" in message:  # Heh. This'll do for now, eh?
             logger.debug(message)
         else:
             logger.info(message)
 
-    def _launchTask(self, driver, path, tags, offer):
+    def _launch_task(self, driver, path, tags, offer):
         """Launch a given dockerfile build task atop the given mesos offer."""
 
         # Generate a task ID
         task_id = str(uuid.uuid1())
-        logger.info("Prepping task %s to build %s", task_id, path)
+        logger.info("Preparing task %s to build %s", task_id, path)
 
         working_dir = os.path.abspath(os.path.dirname(path))
 
@@ -209,8 +217,8 @@ class Scheduler(mesos.Scheduler):
             args += "-v"
 
         task.executor.executor_id.value = task_id
-        task.executor.command.value = "./%s %s build-executor" % (
-            os.path.basename(self.executor_uri), args
+        task.executor.command.value = "cd %s; ./bin/ddocker %s build-executor" % (
+            os.path.basename(self.executor_uri).rstrip(".tar.gz"), args
         )
         task.executor.name = "Docker Build Executor"
         task.executor.source = "ddocker"
@@ -218,7 +226,6 @@ class Scheduler(mesos.Scheduler):
         # Configure the mesos executor with the ddocker executor uri
         ddocker_executor = task.executor.command.uris.add()
         ddocker_executor.value = self.executor_uri
-        ddocker_executor.executable = True
 
         # Add the docker context
         uri = task.executor.command.uris.add()
@@ -241,7 +248,7 @@ class Scheduler(mesos.Scheduler):
 
         logger.info("Launching task %s to build %s", task_id, path)
 
-        driver.launchTasks(offer.id, [task])
+        driver.launch_tasks(offer.id, [task])
         self.running += 1
 
     def _create_filesystem(self, staging_uri, s3_key, s3_secret):
@@ -257,7 +264,7 @@ class Scheduler(mesos.Scheduler):
             )
 
         # S3 filesystem
-        if url.scheme.lower() == "s3":
+        if url.scheme.lower() in ("s3", "s3n"):
             if not url.netloc:
                 raise Exception("You must specify a s3://bucket/ when using s3")
             return S3FS(
@@ -276,6 +283,9 @@ class Scheduler(mesos.Scheduler):
             if cmd == "ADD":
                 local_path, remote_path = instruction
                 tar_path = "context/%s" % str(idx)
+
+                if local_path.startswith("http"):
+                    continue
 
                 if not local_path.startswith("/"):
                     local_path = os.path.join(context_root, local_path)

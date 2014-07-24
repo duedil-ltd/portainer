@@ -1,1 +1,19 @@
-../dist/ddocker.pex
+#!/usr/bin/env bash
+
+#      _     _            _
+#   __| | __| | ___   ___| | _____ _ __
+#  / _` |/ _` |/ _ \ / __| |/ / _ \ '__|
+# | (_| | (_| | (_) | (__|   <  __/ |
+#  \__,_|\__,_|\___/ \___|_|\_\___|_|
+#
+#  Mesos Framework for building docker images atop an Apache Mesos cluster
+
+set -e
+
+cd $(dirname $(dirname "$0"))
+./bin/setup 1>&2
+
+source ./bin/env/bin/activate
+export PYTHONPATH="`pwd`/src:$PYTHONPATH"
+
+python2.7 -m ddocker.app.__main__ "$@"

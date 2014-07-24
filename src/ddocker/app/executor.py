@@ -5,14 +5,16 @@ import docker
 import functools
 import json
 import logging
-import mesos
+import pesos.api
+import pesos.executor
 import os
 import sys
 import threading
 import re
 
+from pesos.vendor.mesos import mesos_pb2
+
 from ddocker.app import subcommand
-from ddocker.proto import mesos_pb2
 from ddocker.proto import ddocker_pb2
 
 
@@ -30,7 +32,7 @@ def args(parser):
 def main(args):
 
     executor = Executor()
-    driver = mesos.MesosExecutorDriver(executor)
+    driver = pesos.executor.MesosExecutorDriver(executor)
 
     status = 0
     if driver.run() == mesos_pb2.DRIVER_STOPPED:
@@ -40,7 +42,7 @@ def main(args):
     sys.exit(status)
 
 
-class Executor(mesos.Executor):
+class Executor(pesos.api.Executor):
 
     TASK_STARTING = mesos_pb2.TASK_STARTING
     TASK_RUNNING = mesos_pb2.TASK_RUNNING
@@ -104,7 +106,7 @@ class Executor(mesos.Executor):
         logger.info("Launched task %s", taskInfo.task_id.value)
 
         # Tell mesos that we're starting the task
-        self._update(driver, taskInfo, self.TASK_STARTING)
+        driver.send_status_update(self.TASK_STARTING)
 
         # Spawn another thread to run the task freeing up the executor
         thread = threading.Thread(target=functools.partial(
@@ -119,16 +121,6 @@ class Executor(mesos.Executor):
 
     def killTask(self, driver, taskId):
         pass
-
-    def _update(self, driver, taskInfo, state):
-        """Send an updated state for a task."""
-
-        logger.info("Sending task update %r for task %s", state, taskInfo.task_id.value)
-
-        update = mesos_pb2.TaskStatus()
-        update.task_id.value = taskInfo.task_id.value
-        update.state = state
-        driver.sendStatusUpdate(update)
 
     def _wrap_docker_stream(self, stream):
         """Wrapper to parse the different types of messages from the
@@ -172,7 +164,7 @@ class Executor(mesos.Executor):
         self.docker_daemon.release()
 
         # Now that docker is up, let's go and do stuff
-        self._update(driver, taskInfo, self.TASK_RUNNING)
+        driver.send_status_update(self.TASK_RUNNING)
 
         try:
             sandbox_dir = os.getcwd()
@@ -238,7 +230,7 @@ class Executor(mesos.Executor):
                     "%s:  ---> %s" % (image_name, message)
                 )
 
-            self._update(driver, taskInfo, self.TASK_FINISHED)
+            driver.send_status_update(self.TASK_FINISHED)
         except Exception, e:
             logger.error("Caught exception building image: %s", e)
-            self._update(driver, taskInfo, self.TASK_FAILED)
+            driver.send_status_update(self.TASK_FAILED)

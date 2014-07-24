@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+#        ___     _          __        _
+#       / / |__ (_)_ __    / /__  ___| |_ _   _ _ __
+#      / /| '_ \| | '_ \  / / __|/ _ \ __| | | | '_ \
+#   _ / / | |_) | | | | |/ /\__ \  __/ |_| |_| | |_) |
+#  (_)_/  |_.__/|_|_| |_/_/ |___/\___|\__|\__,_| .__/
+#                                              |_|
+
+cd $(dirname "$0")
+
+function check_deps() {
+    missing=
+    while [ $1 ]; do
+      if [ ! $(which $1) ]; then
+        echo "Could not find $1."
+        missing=1
+      fi
+      shift
+    done
+    if [ $missing ]; then
+      echo "Not all dependencies found on PATH. Aborting."
+      exit 1
+    fi
+}
+
+check_deps python2.7 virtualenv
+
+export PYTHONPATH=
+export CFLAGS=-Qunused-arguments
+export CPPFLAGS=-Qunused-arguments
+
+# Install the requirements
+if [ ! -f "./env/updated" -o ../requirements.pip -nt ./env/updated ]; then
+  virtualenv ./env -p python2.7
+  ./env/bin/pip install -U distribute==0.6.46
+  ./env/bin/pip install -r ../requirements.pip
+  if [ $? -ne 0 ]; then
+    echo "There was a problem installing requirements. Aborting."
+    exit 1
+  fi
+
+  echo Base requirements installed.
+  touch ./env/updated
+fi

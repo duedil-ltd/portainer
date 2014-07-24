@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+#
+# Script for building the ddocker executor tar file. This script will generate
+# a file in ../dist/ddocker-{git hash}.tar.gz to be uploaded to somewhere accessible
+# from your mesos cluster.
+# 
+# If you have uncommitted changes, the script will do nothing with the FORCE
+# environment variable set.
+#
+
+set -e
+
+cd $(dirname $(dirname $0))
+
+# Help the user out by warning them of uncommitted changes
+if [ -n "$(git status --porcelain)" ]; then
+    if [ ! "$FORCE" ]; then
+        echo "You appear to have uncommitted changes, use FORCE=1 to proceed."
+        exit 1
+    fi
+fi
+
+# Figure out the git revision
+GIT_REV=$(git rev-parse HEAD)
+SOURCE_DIR=$(pwd)
+TAR_NAME="ddocker-$GIT_REV"
+TMP_DIR=$(mktemp -d -t XXXXXX)
+
+echo "Using temporary directory $TMP_DIR"
+
+# Create a copy of the repository
+mkdir -p dist
+pushd dist
+    pushd $TMP_DIR
+        mkdir build
+        cp -r $SOURCE_DIR/** build/
+
+        pushd build
+            make clean
+        popd
+
+        mv build $TAR_NAME
+        tar -cvf $TAR_NAME.tar.gz $TAR_NAME
+    popd
+
+    mv $TMP_DIR/$TAR_NAME.tar.gz ./
+
+    echo "Cleaning up temporary directory"
+    rm -rf $TMP_DIR
+popd

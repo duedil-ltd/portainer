@@ -3,9 +3,6 @@
 # ddocker installed into /opt/ddocker.
 #
 
-REGISTRY my.registry:80
-REPOSITORY testing/foobar
-
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 

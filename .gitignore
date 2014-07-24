@@ -43,6 +43,7 @@ coverage.xml
 .mr.developer.cfg
 .project
 .pydevproject
+.vagrant
 
 # Rope
 .ropeproject

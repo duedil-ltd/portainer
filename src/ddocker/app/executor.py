@@ -103,12 +103,15 @@ class Executor(pesos.api.Executor):
     def reregistered(self, driver, slaveInfo):
         pass
 
-    def launchTask(self, driver, taskInfo):
+    def launch_task(self, driver, taskInfo):
 
         logger.info("Launched task %s", taskInfo.task_id.value)
 
         # Tell mesos that we're starting the task
-        driver.send_status_update(self.TASK_STARTING)
+        driver.send_status_update(mesos_pb2.TaskStatus(
+            task_id=taskInfo.task_id,
+            state=self.TASK_STARTING
+        ))
 
         # Spawn another thread to run the task freeing up the executor
         thread = threading.Thread(target=functools.partial(
@@ -121,7 +124,7 @@ class Executor(pesos.api.Executor):
         thread.setDaemon(False)
         thread.start()
 
-    def killTask(self, driver, taskId):
+    def kill_task(self, driver, taskId):
         pass
 
     def _wrap_docker_stream(self, stream):
@@ -166,7 +169,10 @@ class Executor(pesos.api.Executor):
         self.docker_daemon.release()
 
         # Now that docker is up, let's go and do stuff
-        driver.send_status_update(self.TASK_RUNNING)
+        driver.send_status_update(mesos_pb2.TaskStatus(
+            task_id=taskInfo.task_id,
+            state=self.TASK_RUNNING
+        ))
 
         try:
             sandbox_dir = os.getcwd()
@@ -232,7 +238,13 @@ class Executor(pesos.api.Executor):
                     "%s:  ---> %s" % (image_name, message)
                 )
 
-            driver.send_status_update(self.TASK_FINISHED)
+            driver.send_status_update(mesos_pb2.TaskStatus(
+                task_id=taskInfo.task_id,
+                state=self.TASK_FINISHED
+            ))
         except Exception, e:
             logger.error("Caught exception building image: %s", e)
-            driver.send_status_update(self.TASK_FAILED)
+            driver.send_status_update(mesos_pb2.TaskStatus(
+                task_id=taskInfo.task_id,
+                state=self.TASK_FAILED
+            ))

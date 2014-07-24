@@ -212,13 +212,13 @@ class Scheduler(pesos.api.Scheduler):
         task.slave_id.value = offer.slave_id.value
 
         # Create the executor
-        args = ""
+        args = []
         if self.args.verbose:
-            args += "-v"
+            args.append("--verbose")
 
         task.executor.executor_id.value = task_id
-        task.executor.command.value = "cd %s; ./bin/ddocker %s build-executor" % (
-            os.path.basename(self.executor_uri).rstrip(".tar.gz"), args
+        task.executor.command.value = "./%s/bin/ddocker %s build-executor" % (
+            os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
         task.executor.name = "Docker Build Executor"
         task.executor.source = "ddocker"

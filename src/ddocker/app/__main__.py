@@ -38,7 +38,8 @@ def main(argv):
     formatter = logging.Formatter(fmt="%(asctime)s[%(name)s] %(message)s")
     handler.setFormatter(formatter)
 
-    for logger in ("ddocker.build", "ddocker.scheduler", "ddocker.executor", "pesos"):
+    for logger in ("ddocker.build", "ddocker.scheduler", "ddocker.executor", "pesos",
+                   "compactor", "tornado"):
         logger = logging.getLogger(logger)
         logger.propagate = False
         logger.addHandler(handler)
@@ -49,7 +50,9 @@ def main(argv):
     # Suppress some noisy loggers
     for logger in ("compactor", "tornado"):
         logger = logging.getLogger(logger)
-        logger.setLevel(logging.DEBUG if args.verbose else logging.WARNING)
+        logger.setLevel(
+            logging.DEBUG if args.verbose else logging.WARNING
+        )
 
     args._fn(args)
 

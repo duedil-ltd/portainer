@@ -58,6 +58,8 @@ class Executor(pesos.api.Executor):
 
     def registered(self, driver, executorInfo, frameworkInfo, slaveInfo):
 
+        logger.info("Setting up environment for building containers")
+
         # Parse the build task object
         try:
             build_task = ddocker_pb2.BuildTask()

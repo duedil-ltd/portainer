@@ -9,6 +9,10 @@
 
 cd $(dirname "$0")
 
+if [ ! "$(which virtualenv)" ]; then
+  easy_install 'virtualenv==1.10.1'
+fi
+
 function check_deps() {
     missing=
     while [ $1 ]; do

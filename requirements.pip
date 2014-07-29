@@ -1,9 +1,9 @@
 git+git://github.com/duedil-ltd/tornado.git@1ceefdd89be8c3df217d79e0faa2d1948a231646#egg=tornado
-git+git://github.com/tarnfeld/compactor.git@f92ef15833697d5f42ecbe3a5eb47c90b73a97f6#egg=compactor
-git+git://github.com/tarnfeld/pesos.git@4b18c038eb593a91cfe43e58f62d5c763c60e2ba#egg=pesos
+git+git://github.com/tarnfeld/compactor.git@952af3f4572c7b8b06840d5869757f0d78122498#egg=compactor
+git+git://github.com/tarnfeld/pesos.git@745d4c3446fbe194fc1e380bddede4114dc320df#egg=pesos
 trollius==0.4
 protobuf==2.5.0
-docker-py==0.3.1
+docker-py==0.4.0
 fs==0.5.0
 boto==2.27.0
 progressbar==2.2

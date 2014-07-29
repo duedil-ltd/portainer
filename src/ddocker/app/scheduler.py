@@ -223,6 +223,8 @@ class Scheduler(pesos.api.Scheduler):
         task.executor.command.value = "./%s/bin/ddocker %s build-executor" % (
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
+        task.executor.command.container.image = "docker://jpetazzo/dind"
+        task.executor.command.container.options.append("--privileged")
         task.executor.name = "Docker Build Executor"
         task.executor.source = "ddocker"
 

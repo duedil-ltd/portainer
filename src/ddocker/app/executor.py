@@ -8,9 +8,10 @@ import logging
 import pesos.api
 import pesos.executor
 import os
-import sys
 import threading
+import time
 import re
+import subprocess
 
 from pesos.vendor.mesos import mesos_pb2
 
@@ -21,25 +22,17 @@ from ddocker.proto import ddocker_pb2
 logger = logging.getLogger("ddocker.executor")
 
 
-def args(parser):
-    parser.add_argument("--docker-host",
-                        help="Custom docker host to connect to, if this is not "
-                             "specified an ephemeral docker daemon will be "
-                             "launched by this process.")
-
-
-@subcommand("build-executor", callback=args)
+@subcommand("build-executor")
 def main(args):
 
-    executor = Executor()
-    driver = pesos.executor.MesosExecutorDriver(executor)
+    driver = pesos.executor.MesosExecutorDriver(Executor())
 
-    status = 0
-    if driver.run() == mesos_pb2.DRIVER_STOPPED:
-        status = 1
+    thread = threading.Thread(target=driver.run)
+    thread.setDaemon(True)
+    thread.start()
 
-    driver.stop()
-    sys.exit(status)
+    while thread.isAlive():
+        time.sleep(0.5)
 
 
 class Executor(pesos.api.Executor):
@@ -53,7 +46,6 @@ class Executor(pesos.api.Executor):
         self.build_task = None
 
         self.docker = None
-        self.docker_daemon = threading.Condition()
         self.docker_daemon_up = False
 
     def registered(self, driver, executorInfo, frameworkInfo, slaveInfo):
@@ -72,30 +64,31 @@ class Executor(pesos.api.Executor):
 
         # Launch the docker daemon
         def launch_docker_daemon():
-            self.docker_daemon.acquire()
+            logger.info("Launching docker daemon subprocess")
 
-            if self.docker_daemon_up:
-                return
-
-            # Launch the subprocess
-            # self._fork_docker()
-            # Sleep for a second
-            import time
-            time.sleep(10)
-            # Test the REST API
+            # TODO(tarnfeld): This should be made a little more flexible
+            proc = subprocess.Popen(["/usr/local/bin/wrapdocker"])
 
             self.docker = docker.Client()
+            while True:
+                try:
+                    self.docker.ping()
+                except:
+                    logger.info("Waiting for docker daemon to respond to pings")
+                    time.sleep(1)
+                else:
+                    self.docker_daemon_up = True
+                    break
 
-            self.docker_daemon.notifyAll()
-            self.docker_daemon.release()
+            proc.wait()
 
         if not build_task.HasField("docker_host"):
             daemon_thread = threading.Thread(target=launch_docker_daemon)
             daemon_thread.setDaemon(True)
             daemon_thread.start()
         else:
-            host = "http://%s/" % build_task.docker_host
-            self.docker = docker.Client(host)
+            self.docker = docker.Client(build_task.docker_host)
+            self.docker_daemon_up = True
 
     def disconnected(self, driver):
         pass
@@ -121,11 +114,8 @@ class Executor(pesos.api.Executor):
             self.build_task
         ))
 
-        thread.setDaemon(False)
+        thread.setDaemon(True)
         thread.start()
-
-    def kill_task(self, driver, taskId):
-        pass
 
     def _wrap_docker_stream(self, stream):
         """Wrapper to parse the different types of messages from the
@@ -162,11 +152,11 @@ class Executor(pesos.api.Executor):
     def _build_image(self, driver, taskInfo, buildTask):
         """Build an image for the given buildTask."""
 
+        logger.info("Waiting for docker daemon to be available")
+
         # Wait for the docker daemon to be ready
-        self.docker_daemon.acquire()
-        while not self.docker:
-            self.docker_daemon.wait()
-        self.docker_daemon.release()
+        while not self.docker_daemon_up:
+            time.sleep(1)
 
         # Now that docker is up, let's go and do stuff
         driver.send_status_update(mesos_pb2.TaskStatus(
@@ -175,7 +165,7 @@ class Executor(pesos.api.Executor):
         ))
 
         try:
-            sandbox_dir = os.getcwd()
+            sandbox_dir = os.environ["MESOS_DIRECTORY"]
             context_path = os.path.join(sandbox_dir, buildTask.context)
 
             registry_url = ""
@@ -205,8 +195,8 @@ class Executor(pesos.api.Executor):
                 )
 
                 for message in self._wrap_docker_stream(build_request):
-                    driver.sendFrameworkMessage(
-                        "%s: %s" % (image_name, message)
+                    driver.send_framework_message(
+                        str("%s: %s" % (image_name, message))
                     )
 
             # Extract the newly created image ID
@@ -217,7 +207,7 @@ class Executor(pesos.api.Executor):
 
             # Tag the image with all the required tags
             tags = buildTask.image.tag or ["latest"]
-            driver.sendFrameworkMessage("%s: Tagging image %s" % (image_name, image_id))
+            driver.send_framework_message(str("%s: Tagging image %s" % (image_name, image_id)))
             for tag in tags:
                 try:
                     self.docker.tag(
@@ -226,16 +216,16 @@ class Executor(pesos.api.Executor):
                         tag=tag,
                         force=True
                     )
-                    driver.sendFrameworkMessage("%s:  ---> %s" % (image_name, tag))
+                    driver.send_framework_message(str("%s:  ---> %s" % (image_name, tag)))
                 except Exception, e:
                     raise e
 
             # Push the image to the registry
-            driver.sendFrameworkMessage("%s: Pushing image" % image_name)
+            driver.send_framework_message("%s: Pushing image" % image_name)
             push_request = self.docker.push(image_name, stream=True)
             for message in self._wrap_docker_stream(push_request):
-                driver.sendFrameworkMessage(
-                    "%s:  ---> %s" % (image_name, message)
+                driver.send_framework_message(
+                    str("%s:  ---> %s" % (image_name, message))
                 )
 
             driver.send_status_update(mesos_pb2.TaskStatus(

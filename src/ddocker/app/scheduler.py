@@ -61,12 +61,13 @@ class Scheduler(pesos.api.Scheduler):
 
         # Spawn another thread to handle offer processing to free up the driver
         def handle_offers():
+            decline_offers = []
             for offer in offers:
                 offer_cpu = 0.0
                 offer_mem = 0
 
                 if self.task_queue.empty():
-                    driver.decline_offer(offer.id)
+                    decline_offers.append(offer.id)
                     continue
 
                 for resource in offer.resources:
@@ -85,8 +86,10 @@ class Scheduler(pesos.api.Scheduler):
                         logger.error("Caught exception launching task %r", e)
                         self.task_queue.task_done()
                 else:
-                    self.decline_offer(offer.id)
                     logger.debug("Ignoring offer %r", offer)
+
+            if decline_offers:
+                driver.decline_offer(decline_offers)
 
         t = threading.Thread(target=handle_offers)
         t.setDaemon(True)

@@ -24,9 +24,9 @@ def args(parser):
 
     # Isolation
     group = parser.add_argument_group("isolation")
-    group.add_argument("--cpu-limit", default=1.0,
+    group.add_argument("--cpu-limit", default=2.0,
                        help="CPU allocated to building the image")
-    group.add_argument("--mem-limit", default=256,
+    group.add_argument("--mem-limit", default=1024 * 4,
                        help="Memory allocated to building the image (mb)")
 
     # Arguments for the staging filesystem

@@ -1,10 +1,13 @@
 #
-# Example ddocker Dockerfile template to build a docker image with
-# ddocker installed into /opt/ddocker.
+# Example ddocker Dockerfile template to build a docker image with the
+# ddocker source installed into /opt/ddocker.
 #
 
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 
+# REPOSITORY ddocker/test
+# REGISTRY your-registry
+
 WORKDIR /opt/ddocker
-ADD ../ /opt/ddocker
+ADD ../src /opt/ddocker-src

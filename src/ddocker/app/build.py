@@ -16,7 +16,7 @@ logger = logging.getLogger("ddocker.build")
 
 
 def args(parser):
-    parser.add_argument("dockerfile")
+    parser.add_argument("dockerfile", nargs="+")
     parser.add_argument("--tag", action="append", default=[], dest="tags",
                         help="Multiple tags to apply to the image once built")
     parser.add_argument("--executor-uri", dest="executor", required=True,
@@ -68,7 +68,8 @@ def main(args):
     )
 
     # Put the task onto the queue
-    task_queue.put((args.dockerfile, args.tags))
+    for dockerfile in args.dockerfile:
+        task_queue.put((dockerfile, args.tags))
 
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)

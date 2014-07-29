@@ -1,52 +1,51 @@
 
-# ddocker [WIP]
+# ddocker
 
-**Distributed Docker** is a handy CLI tool for building a docker container on an [Apache Mesos](http://mesos.apache.org) Cluster.
+What is *ddocker*? It's an [Apache Mesos](http://mesos.apache.org) framework that enables you to launch remote `docker build` tasks on a large cluster of machines, without having specialised resources for doing intermittent work that have low utilization.
 
-## Building ddocker
+You can use regular `Dockerfile` files with ddocker, you just need to add an extra line so the task knows where to push the image when it's finished building. Including this won't interfere with a plain old `docker build` invocation, it'll just be ignored.
+
+```
+REGISTRY my-registry.foo.net
+REPOSITORY foo/bar
+```
+
+## Getting Started
 
 ### Dependencies
 
 You'll need to have the following dependencies installed to compile;
 
 - Python 2.7
+- Virtualenv (installed automatically via `easy_install` if it's missing)
 - Protocol Buffers (`brew install protobuf`)
 - Automake
 
 #### Mesos Slave Dependencies
 
-- If you're using any current stable version of mesos, with standard isolation, you'll need to ensure `lxc-docker` is installed (but not required to be running) on each mesos slave.
-- If you happen to be running a mesos cluster with [Deimos](https://github.com/mesosphere/deimos), this tool should work right out of the box, automatically launching within a pre-built docker image (with docker installed). *Yo dawg.*
-
-### Compiling with `make`
-
-Building ddocker is easy, it uses the [pants](http://pantsbuild.github.io) build system from Twitter, and compiles into encapsulated [Python Executables](http://pex.readthedocs.org).
-
-```shell
-$ make dist
-```
-
-The make command above will generate an executable inside the `dist/` folder. This is ddocker.
+**Note: For ddocker to work out of the box, you need to be using Mesos+Docker (e.g with [Deimos](https://github.com/mesosphere/deimos)). This isn't a fundamental requirement, and you can use your own docker daemon by using the `--docker-host` command line argument.**
 
 ## Building Images
 
 ### 1. Upload the executor
 
-To enable mesos to build the image and interact with ddocker you'll need to upload the build `dist/ddocker.pex` file somewhere mesos can get to it. This could either be on each slave, in S3 or HDFS. Once you've done that, specify the path using the `--executor-uri` argument.
+Use the `bin/build-executor` script to generate an executor tar, it'll be put into `dist/`. If you have any changes locally, the script will exit and warn you before doing anything.
 
-### 2. Write your Dockerfile.in
+Once you've uploaded that to somewhere mesos can get to it... save the full URI for later.
 
-The dockerfiles used by ddocker are almost identical functionally to those used by docker itself. However, ddocker introduces a couple of new build commands that are required, adding these **will not** cause the `Dockerfile` to be unusable with the standalone `docker build`, they will be skipped and ignored.
+### 2. Write your `Dockerfile`
+
+As mentioned above, the `Dockerfile`s used by ddocker are almost identical to those used by docker itself. However, ddocker introduces a couple of new commands that are required, adding these **will not** cause the `Dockerfile` to be unusable with the standalone `docker build` tool, they will be skipped and ignored.
 
 - `REGISTRY` - The docker registry to push the image to once built
 - `REPOSITORY` - The name of the image repository (i.e `tarnfeld/ddocker`)
 
 ### 3. Launch ddocker
 
-After building ddocker, the `pex` executable files in `dist/` are good to go, they are fully transferable (so long as it's the same machine architecture). The `example` directory contains a `Dockerfile.in` template ready to build with ddocker, simply run the commands below to build a docker image containg this `ddocker/` repository folder.
+Now that you've got everything set up, you should be good to go. Because ddocker uses a pure-python implementation of the Mesos API there's no complex dependencies to install. The `bin/setup` script will do it all for you.
 
 **Note: ** The following example assumes you have the `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables set, if not, you'll need to use the `--aws-*` command line options.
 
 ```shell
-$ ./dist/ddocker.pex build example/Dockerfile.in --executor-uri s3://my-bucket/ddocker.pex --staging-uri s3://my-bucket/ddocker
+$ ./bin/ddocker --mesos-master="1.2.3.4:5050" build --executor-uri hdfs:///mesos/ddocker-XXXX.tar.gz --staging-uri s3://my-bucket/ddocker path/to/Dockerfile
 ```

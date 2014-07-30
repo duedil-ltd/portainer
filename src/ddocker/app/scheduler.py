@@ -208,7 +208,7 @@ class Scheduler(pesos.api.Scheduler):
 
         # Define the mesos task
         task = mesos_pb2.TaskInfo()
-        task.name = "build"
+        task.name = "Repository: %s/%s Registry: %s" % (user, repo, ":".join(registry))
         task.task_id.value = task_id
         task.slave_id.value = offer.slave_id.value
 

@@ -70,9 +70,9 @@ class Scheduler(pesos.api.Scheduler):
 
                 for resource in offer.resources:
                     if resource.name == "cpus":
-                        offer_cpu = resource.scalar
+                        offer_cpu = resource.scalar.value
                     if resource.name == "mem":
-                        offer_mem = resource.scalar
+                        offer_mem = resource.scalar.value
 
                 # Launch the task if applicable
                 if offer_cpu >= self.cpu and offer_mem >= self.mem:

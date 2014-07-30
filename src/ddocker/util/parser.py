@@ -15,7 +15,7 @@ def parse_dockerfile(path):
 
             line_buf += line
 
-            if line_buf.endswith("\\"):
+            if line.rstrip().endswith('\\'):
                 continue
 
             line_buf = line_buf.rstrip().rstrip("\\")

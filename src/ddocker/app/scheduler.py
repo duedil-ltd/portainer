@@ -29,8 +29,8 @@ class Scheduler(pesos.api.Scheduler):
     def __init__(self, task_queue, executor_uri, cpu_limit, mem_limit, args):
         self.task_queue = task_queue
         self.executor_uri = executor_uri
-        self.cpu = cpu_limit
-        self.mem = mem_limit
+        self.cpu = float(cpu_limit)
+        self.mem = int(mem_limit)
         self.args = args
 
         self.running = 0

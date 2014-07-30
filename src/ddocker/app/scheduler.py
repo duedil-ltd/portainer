@@ -57,8 +57,6 @@ class Scheduler(pesos.api.Scheduler):
     def resource_offers(self, driver, offers):
         """Called when resource offers are sent from the mesos cluster."""
 
-        logger.info("Received %d offers from mesos", len(offers))
-
         # Spawn another thread to handle offer processing to free up the driver
         def handle_offers():
             decline_offers = []

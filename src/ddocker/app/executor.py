@@ -138,7 +138,8 @@ class Executor(pesos.api.Executor):
                 friendly_message = None
 
                 if "stream" in update:
-                    friendly_message = update["stream"].rstrip()
+                    friendly_message = re.sub(r'\033\[[0-9;]*m', '',
+                                              update["stream"].rstrip())
                 if "status" in update:
                     friendly_message = update["status"].rstrip()
                     if "id" in update:

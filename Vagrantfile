@@ -17,8 +17,7 @@ Vagrant.configure("2") do |config|
   # Use the same base box as vagrant-web
   config.vm.box = "debian-73-x64-virtualbox-nocm"
 
-  # Share the containerizer source into the VM
-  config.vm.synced_folder "./", "/opt/ddocker"
+  config.vm.synced_folder "./", "/opt/portainer"
   config.vm.network :private_network, ip: "192.168.33.50"
 
   # Configure the VM with 1024Mb of RAM and 2 CPUs

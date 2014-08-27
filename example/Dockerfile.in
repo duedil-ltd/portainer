@@ -1,13 +1,12 @@
 #
-# Example ddocker Dockerfile template to build a docker image with the
-# ddocker source installed into /opt/ddocker.
+# Example portainer Dockerfile template to build a docker image with the
+# portainer source installed into /opt/portainer.
 #
 
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 
-# REPOSITORY ddocker/test
-# REGISTRY your-registry
+REPOSITORY portainer/test
 
-WORKDIR /opt/ddocker
-ADD ../src /opt/ddocker-src
+WORKDIR /opt/portainer
+ADD http://github.com/duedil-ltd/portainer/archive/master.zip /opt/portainer

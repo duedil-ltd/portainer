@@ -50,7 +50,7 @@ As mentioned above, the `Dockerfile`s used by portainer are almost identical to 
 *Note: Adding these extra commands will **not** cause the `Dockerfile` to be unusable with the standard `docker build` command. They will simply be ignored.*
 
 - `REGISTRY` - The docker registry to push the image to once built
-- `REPOSITORY` - The name of the image repository (i.e `duedil-ltd/portainer`)
+- `REPOSITORY` - The name of the image repository (i.e `duedil-ltd/portainer` (**required**))
 - `CPUS` - The number of CPUs required to build the image (a float)
 - `MEM` - The amount of memory required to build the image (int, in megabytes)
 

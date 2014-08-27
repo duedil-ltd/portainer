@@ -27,23 +27,23 @@ You'll need to have the following dependencies installed to run the framework, t
 
 ### Mesos Slave Dependencies
 
-Portainer will launch an ephemeral docker daemon on the, slave configured to work within the mesos sandbox provided. This means the build artifacts left behind by docker (from `docker build`) will be cleaned out automatically by the mesos GC process.
+Portainer will launch an ephemeral docker daemon on the slave, configured to work within the mesos sandbox provided. This means the build artifacts left behind by docker (from `docker build`) will be cleaned out automatically by the mesos GC process.
 
 This means the Mesos slave nodes are required to have a `docker` executable installed, though the docker daemon does not need to be running.
 
-##### Docker Containerizer
+#### Docker Containerizer
 
 If you're using the [mesos docker integration](http://mesos.apache.org/documentation/latest/docker-containerizer/) you can specify the `--docker-executor-image` command line flag to specify the image to be used for building inside. If you're happy using a public image, you can use `--docker-executor-image=jpetazzo/dind`
 
 ## Building Images
 
-### 1. Upload the mesos executor
+#### 1. Upload the mesos executor
 
 Before being able to use portainer, you need to upload the executor code for mesos to launch on the slave nodes. You can build it using `make executor`. If you have any changes locally, the script will exit and warn you before doing anything. The archive will be build into `./dist/` and needs to be uploaded somewhere mesos can reach it (HDFS, S3, FTP, HTTP etc).
 
 Once you've uploaded that to somewhere.. save the full URL for later.
 
-### 2. Write your `Dockerfile`
+#### 2. Write your `Dockerfile`
 
 As mentioned above, the `Dockerfile`s used by portainer are almost identical to those used by docker itself. There are a few extra commands that can be used as metadata for portainer, one of which is required.
 
@@ -56,7 +56,7 @@ As mentioned above, the `Dockerfile`s used by portainer are almost identical to 
 
 For an example, take a look at the `Dockerfile` provided in the `./example` folder. This can be used to build an image of the portainer source code.
 
-### 4. Local `ADD` sources
+#### 4. Local `ADD` sources
 
 If your `Dockerfile` (like the example provided) contains no `ADD` commands that use local files (`http://` is fine), you can skip this step entirely. If you do use local sources, continue reading.
 
@@ -72,7 +72,7 @@ Use the `--staging-uri` command line flag to specify this. For example to distri
 
 *Note: Portainer imposes no restrictions on symlinks or relative paths in `ADD` commands, unlike docker. In some situations this can pose security issues if building `Dockerfile`s from untrusted sources. Portainer and the mesos executor will only have access to files readable to the user it's running as, so don't run as `root`.*
 
-### 3. Launch portainer
+#### 3. Launch portainer
 
 Now that you've got everything set up, you should be good to go. Because portainer uses a pure-python implementation of the Mesos Framework API ([called pesos](http://github.com/wickman/pesos)) there is no requirement to install mesos itself.
 

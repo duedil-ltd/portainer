@@ -1,5 +1,34 @@
 
-# portainer
+```
+                   .,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.
+                   ,                          .,
+                  `,                          ,.
+                  ,`                          .,     _        _
+               ``.,                 _ __   ___,._ __| |_ __ _(_)_ __   ___ _ __
+           `. ``.,.`..             | '_ \ / _ \| '__| __/ _` | | '_ \ / _ \ '__|
+   .`.```  ...``..`   ```` `.`     | |_) | (_) | |  | || (_| | | | | |  __/ |
+ ...........,`.`............,      | .__/ \___/|_|   \__\__,_|_|_| |_|\___|_|
+           ,  `  .```.````.`,      |_| ,.,.,.,.,.,.,.,,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,
+           ,   , `                     ,              ,              ,              ,
+           , .`` `                     ,              ,              ,              ,
+           , .   `                     ,.,.,.,.,.,.,.,,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,
+           , .   `                     ,              ,              ,              ,
+           , .   `                     ,              ,              ,              ,
+     .`.,,,,,,,,,..                    ``````````````````````````````````````````````
+           `     ,
+           ```````                               ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+````````````````````````````````                 \
+                               |¸.·´¯`·.´¯`·.¸¸.·´\     o    o    o    o    o    o    o
+                               |                   \
+    __|___|___|___|___|___|    |                    \...................................
+       |___|___|___|___|       |   (
+         ___|___|___|___|      |    )  (      _/|_/       |  |
+      |___|___|___|            |   (    )    <').-\        \/        Y
+                               |    )  (     ``            |  /!-!\  |
+                               |   (    )                   \|     |/
+                               |    )  (                     _\___/_
+                               |   (    )                   / /   \ \
+```
 
 Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines. Given a valid `Dockerfile`, portainer can build your image and push it to a private registry faster than you can count to `n`.
 
@@ -57,7 +86,7 @@ As mentioned above, the `Dockerfile`s used by portainer are almost identical to 
 
 For an example, take a look at the `Dockerfile` provided in the `./example` folder. This can be used to build an image of the portainer source code.
 
-#### 3. Local `ADD` sources 
+#### 3. Local `ADD` sources
 
 If your `Dockerfile` (like the example provided) contains no `ADD` commands that use local files (`http://` is fine), you can skip this step entirely. If you do use local sources, continue reading.
 

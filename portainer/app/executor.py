@@ -13,6 +13,7 @@ import time
 import re
 import subprocess
 import traceback
+import io
 
 from pesos.vendor.mesos import mesos_pb2
 
@@ -170,10 +171,10 @@ class Executor(mesos.interface.Executor):
         ))
 
         try:
-            sandbox_dir = os.environ["MESOS_DIRECTORY"]
-            context_path = os.path.join(sandbox_dir, buildTask.context)
+            if not buildTask.context and not buildTask.dockerfile:
+                raise Exception("Either a build context or dockerfile is required")
 
-            registry_url = ""
+            registry_url = None
             if buildTask.image.HasField("registry"):
                 registry_url = buildTask.image.registry.hostname
                 if buildTask.image.registry.HasField("port"):
@@ -183,22 +184,12 @@ class Executor(mesos.interface.Executor):
             if not registry_url:
                 raise Exception("No registry URL provided")
 
-            image_name = "%s%s/%s" % (
-                registry_url,
-                buildTask.image.repository.username,
-                buildTask.image.repository.repo_name
-            )
+            image_name = registry_url + buildTask.image.repository
+            logger.info("Building image %s", image_name)
 
-            logger.info("Building image %s from context %s", image_name, context_path)
-
-            if not os.path.exists(context_path):
-                raise Exception("Context %s does not exist" % (context_path))
-
-            with open(context_path, "r") as context:
+            if buildTask.dockerfile:
                 build_request = self.docker.build(
-                    fileobj=context,
-                    custom_context=True,
-                    encoding="gzip",
+                    fileobj=io.StringIO(buildTask.dockerfile),
                     stream=True
                 )
 
@@ -207,6 +198,26 @@ class Executor(mesos.interface.Executor):
                         driver.sendFrameworkMessage(
                             str("%s: %s" % (image_name, message))
                         )
+            else:
+                sandbox_dir = os.environ["MESOS_DIRECTORY"]
+                context_path = os.path.join(sandbox_dir, buildTask.context)
+
+                if not os.path.exists(context_path):
+                    raise Exception("Context %s does not exist" % (context_path))
+
+                with open(context_path, "r") as context:
+                    build_request = self.docker.build(
+                        fileobj=context,
+                        custom_context=True,
+                        encoding="gzip",
+                        stream=True
+                    )
+
+                    for message, is_stream in self._wrap_docker_stream(build_request):
+                        if not is_stream or (is_stream and buildTask.stream):
+                            driver.sendFrameworkMessage(
+                                str("%s: %s" % (image_name, message))
+                            )
 
             # Extract the newly created image ID
             match = re.search(r'built (.*)$', message)

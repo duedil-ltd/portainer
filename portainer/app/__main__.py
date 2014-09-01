@@ -27,9 +27,6 @@ def main(argv):
                        help="Custom host[:port] for the docker daemon, if not "
                             "specified a short-lived docker daemon will be "
                             "launched for you automatically")
-    group.add_argument("--docker-args", default=None,
-                       help="When launching an ephemeral docker daemon, these "
-                            "arguments will be passed to the `docker -d` call")
 
     args = parser.parse_args(argv)
 

@@ -25,20 +25,20 @@ def args(parser):
     group = parser.add_argument_group("build")
     group.add_argument("--build-cpu", default=2.0,
                        help="CPU allocated to building the images")
-    group.add_argument("--build-mem", default=1024 * 4,
+    group.add_argument("--build-mem", default=1024,
                        help="Memory allocated to building the image (mb)")
-    group.add_argument("--registry", required=None,
-                       help="Docker registry URL to push images to")
-    group.add_argument("--repository", required=None,
+    group.add_argument("--repository", required=False,
                        help="Repository name for the docker image (e.g foo/bar)")
+    group.add_argument("--from", required=False, dest="pull_registry",
+                       help="Docker registry to pull images FROM")
+    group.add_argument("--to", required=True, dest="push_registry",
+                       help="Docker registry to push built images TO")
     group.add_argument("--stream", default=False, action="store_true",
                        help="Stream the docker build output to the framework")
-    group.add_argument("--variable", nargs=2, action="append", default=[], dest="variables",
-                       help="Assign key/value variables to be used in Dockerfiles")
 
     # Arguments for the staging filesystem
     group = parser.add_argument_group("fs")
-    group.add_argument("--staging-uri", required=True,
+    group.add_argument("--staging-uri", required=False,
                        help="The URI to use as a base directory for staging files.")
 
 
@@ -59,14 +59,17 @@ def main(args):
         framework.id.value = args.framework_id
 
     scheduler = Scheduler(
-        [(d, args.tags) for d in args.dockerfile],
-        args.executor,
-        args.build_cpu,
-        args.build_mem,
-        args.registry,
-        args.repository,
-        dict([(k.lower(), v) for k, v in args.variables]),
-        args
+        tasks=[(d, args.tags) for d in args.dockerfile],
+        executor_uri=args.executor,
+        cpu_limit=args.build_cpu,
+        mem_limit=args.build_mem,
+        repository=args.repository,
+        pull_registry=args.pull_registry,
+        push_registry=args.push_registry,
+        staging_uri=args.staging_uri,
+        stream=args.stream,
+        docker_host=args.docker_host,
+        verbose=args.verbose
     )
 
     driver = pesos.scheduler.PesosSchedulerDriver(

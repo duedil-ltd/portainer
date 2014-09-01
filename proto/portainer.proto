@@ -9,6 +9,7 @@ package portainer;
 message BuildTask {
     required DockerImage image = 1;
     optional string context = 2;
+    optional string dockerfile = 6; // Optional string representation of the Dockerfile to build
     optional bool stream = 5; // Should we stream the build output?
 
     // These are used when launching/connecting to the docker daemon
@@ -20,13 +21,8 @@ message BuildTask {
  * Representation of a docker image
  */
 message DockerImage {
-  message DockerRepository {
-    required string username = 1;
-    required string repo_name = 2;
-  }
-
-  required DockerRepository repository = 1;
   optional DockerRegistry registry = 2;
+  required string repository = 1;
   repeated string tag = 3;
 }
 

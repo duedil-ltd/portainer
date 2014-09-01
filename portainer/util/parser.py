@@ -2,13 +2,11 @@
 Simple parser for Dockerfile's.
 """
 
-import re
 
-
-def parse_dockerfile(path, variables={}):
+def parse_dockerfile(path, **kwargs):
     """Parse a dockerfile and return a new Dockerfile object"""
 
-    dockerfile = Dockerfile(variables=variables)
+    dockerfile = Dockerfile(**kwargs)
     with open(path) as f:
         line_buf = ""
         for line in f:
@@ -45,22 +43,24 @@ class Dockerfile(object):
 
     It's always useful to remember that instruction values are always lists.
 
-    This model also introduces support for variables into the Dockerfile
-    syntax. These can be referenced using %% signs. The variables will then
-    be replaced with their respective value passed in to the constructor
-    of the Dockerfile instance.
+    If the `registry` parameter is present, any FROM instructions will be
+    modified to pull images from the given registry. For example...
+
+    `FROM foo/bar`
+     -> This will be pulled from `{registry}/foo/bar`
+    `FROM ubuntu`
+     -> This will be pulled from `{registry}/ubuntu`
     """
 
     INTERNAL = ["REGISTRY", "REPOSITORY", "BUILD_CPU", "BUILD_MEM"]
 
-    def __init__(self, lines=[], variables={}):
+    def __init__(self, lines=[], registry=None):
         self.instructions = []
-        self.variables = variables
+        self.registry = registry
 
         self.build_cpu = None
         self.build_mem = None
         self.repository = None
-        self.registry = None
 
         for line in lines:
             self.add_instruction(line)
@@ -69,27 +69,23 @@ class Dockerfile(object):
         self.add_instruction(instruction)
         return self
 
-    def replace_variables(self, line):
-        # Find all variables in the line
-        for match in re.finditer(r'%([A-z_]+)%', line):
-            if not match.group(1).endswith("\\"):
-                key = match.group(1).lower()
-                if key not in self.variables:
-                    raise Exception("Variable %%%s%% not defined" % (key))
-                line = line[:match.start()] + self.variables[key] + line[match.end():]
-        return line
-
     def add_instruction(self, instruction):
         parts = instruction.split(" ")
         command = parts[0].upper()
-        arguments = [self.replace_variables(a) for a in parts[1:]]
+        arguments = parts[1:]
+
+        if command == "FROM" and self.registry:
+            parts = arguments[0].split("/")
+            if len(parts) <= 2:
+                parts[:0] = [self.registry]
+                arguments = ["/".join(parts)]
 
         self.instructions.append((command, arguments))
 
         if command.lower() in self.INTERNAL:
             setattr(self, command.lower(), arguments)
 
-    def get(self, filter_command, default=None):
+    def get(self, filter_command, default=[]):
         for command, instruction in self.instructions:
             if command == filter_command:
                 yield instruction
@@ -97,3 +93,35 @@ class Dockerfile(object):
         else:
             if filter(None, default):
                 yield default
+
+    @property
+    def has_local_sources(self):
+        return len(
+            filter(
+                lambda (src, dst): src.startswith("http"),
+                self.get("ADD")
+            )
+        ) > 0
+
+    def build(self):
+        return "\n".join([" ".join([i[0]] + i[1]) for i in self.instructions])
+
+
+
+
+# def parse(from_str):
+#     reg = user = repo = tag = None
+
+#     p = from_str.split("/")
+#     if len(p) == 1:
+#         repo = p[0]
+#     elif len(p) == 2:
+#         reg_or_user, repo = p
+#         if set(".-") in set(reg_or_user):
+#             reg = reg_or_user
+#         else:
+#             user = reg_or_user
+#     elif len(p) == 3:
+#         reg, user, repo = p
+
+#     return dict(reg=reg, user=user, repo=repo, tag=tag)

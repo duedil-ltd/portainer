@@ -76,11 +76,11 @@ Before being able to use Portainer, you need to upload the executor code somewhe
 
 #### 2. Write your `Dockerfile`
 
-Portainer can work out of the box on existing `Dockerfile` files with no modifications. To do this, you _must_ specify a repository for your image, using `--repository duedil/portainer`.
+Portainer can work out of the box on existing `Dockerfile` files with no modifications. To do this, you _must_ specify a repository for your image, using the `--repository` command line argument, for example`--repository duedil/portainer`.
 
-You must also specify a private registry to push the image to once successfully built, using `--to my.registry:1234`.
+You must also specify a private registry to push the image to once successfully built, using the `--to` command line argument, for example `--to my.registry:1234`.
 
-If your `Dockerfile` is based upon a private image (in the `FROM` instruction) not available in the public docker index, you can use the `--from my.registry:1234` argument to configure where dependent images are pulled from. It is worth noting that when `--from` is used, all images are pulled from the given registry, and the public index is **never** used. This can be useful to mirroring public images and avoid being dependent on the public index.
+If your `Dockerfile` is based upon a private image (in the `FROM` instruction) not available in the public docker index, you can use the `--from my.registry:1234` argument to configure where dependent images are pulled from. It is worth noting that when `--from` is used, all images are pulled from the given registry, and the public index is **never** used. This can be useful for mirroring public images which avoids being dependent on the public index.
 
 Since Mesos is based around the concept of _Resources_, build tasks need some CPU and Memory to be able to execute. Defaults are provided, but the `--build-cpu` and `--build-mem` command line flags can be used to configure the resource allocation used.
 

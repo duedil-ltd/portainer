@@ -5,27 +5,28 @@ import docker
 import functools
 import json
 import logging
-import pesos.api
+import mesos.interface
 import pesos.executor
 import os
 import threading
 import time
 import re
 import subprocess
+import traceback
 
 from pesos.vendor.mesos import mesos_pb2
 
-from ddocker.app import subcommand
-from ddocker.proto import ddocker_pb2
+from portainer.app import subcommand
+from portainer.proto import portainer_pb2
 
 
-logger = logging.getLogger("ddocker.executor")
+logger = logging.getLogger("portainer.executor")
 
 
 @subcommand("build-executor")
 def main(args):
 
-    driver = pesos.executor.MesosExecutorDriver(Executor())
+    driver = pesos.executor.PesosExecutorDriver(Executor())
 
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)
@@ -35,7 +36,7 @@ def main(args):
         time.sleep(0.5)
 
 
-class Executor(pesos.api.Executor):
+class Executor(mesos.interface.Executor):
 
     TASK_STARTING = mesos_pb2.TASK_STARTING
     TASK_RUNNING = mesos_pb2.TASK_RUNNING
@@ -54,7 +55,7 @@ class Executor(pesos.api.Executor):
 
         # Parse the build task object
         try:
-            build_task = ddocker_pb2.BuildTask()
+            build_task = portainer_pb2.BuildTask()
             build_task.ParseFromString(executorInfo.data)
         except Exception:
             logger.error("Failed to parse BuildTask in ExecutorInfo.data")
@@ -68,6 +69,7 @@ class Executor(pesos.api.Executor):
 
             # TODO(tarnfeld): This should be made a little more flexible
             proc = subprocess.Popen(["/usr/local/bin/wrapdocker"])
+            # os.environ["MESOS_DIRECTORY"]
 
             self.docker = docker.Client()
             while True:
@@ -91,22 +93,16 @@ class Executor(pesos.api.Executor):
             self.docker_daemon_up = True
 
     def disconnected(self, driver):
-        pass
+        log.info("Disconnected from master! Ahh!")
 
     def reregistered(self, driver, slaveInfo):
-        pass
+        log.info("Re-registered from the master! Ahh!")
 
-    def launch_task(self, driver, taskInfo):
+    def launchTask(self, driver, taskInfo):
 
         logger.info("Launched task %s", taskInfo.task_id.value)
 
-        # Tell mesos that we're starting the task
-        driver.send_status_update(mesos_pb2.TaskStatus(
-            task_id=taskInfo.task_id,
-            state=self.TASK_STARTING
-        ))
-
-        # Spawn another thread to run the task freeing up the executor
+        # Spawn another thread to run the task, freeing up the executor
         thread = threading.Thread(target=functools.partial(
             self._build_image,
             driver,
@@ -132,12 +128,14 @@ class Executor(pesos.api.Executor):
             else:
                 if "error" in update:
                     logger.error("Docker error: %s", update["error"])
-                    yield update["error"]
+                    yield update["error"], False
                     raise Exception("Docker encountered an error")
 
                 friendly_message = None
+                is_stream = False
 
                 if "stream" in update:
+                    is_stream = True
                     friendly_message = re.sub(r'\033\[[0-9;]*m', '',
                                               update["stream"].rstrip())
                 if "status" in update:
@@ -148,10 +146,16 @@ class Executor(pesos.api.Executor):
                         friendly_message += " (%s)" % update["progress"]
 
                 if friendly_message is not None:
-                    yield friendly_message
+                    yield friendly_message, is_stream
 
     def _build_image(self, driver, taskInfo, buildTask):
         """Build an image for the given buildTask."""
+
+        # Tell mesos that we're starting the task
+        driver.sendStatusUpdate(mesos_pb2.TaskStatus(
+            task_id=taskInfo.task_id,
+            state=self.TASK_STARTING
+        ))
 
         logger.info("Waiting for docker daemon to be available")
 
@@ -160,7 +164,7 @@ class Executor(pesos.api.Executor):
             time.sleep(1)
 
         # Now that docker is up, let's go and do stuff
-        driver.send_status_update(mesos_pb2.TaskStatus(
+        driver.sendStatusUpdate(mesos_pb2.TaskStatus(
             task_id=taskInfo.task_id,
             state=self.TASK_RUNNING
         ))
@@ -175,6 +179,9 @@ class Executor(pesos.api.Executor):
                 if buildTask.image.registry.HasField("port"):
                     registry_url += ":%d" % buildTask.image.registry.port
                 registry_url += "/"
+
+            if not registry_url:
+                raise Exception("No registry URL provided")
 
             image_name = "%s%s/%s" % (
                 registry_url,
@@ -195,10 +202,11 @@ class Executor(pesos.api.Executor):
                     stream=True
                 )
 
-                for message in self._wrap_docker_stream(build_request):
-                    driver.send_framework_message(
-                        str("%s: %s" % (image_name, message))
-                    )
+                for message, is_stream in self._wrap_docker_stream(build_request):
+                    if not is_stream or (is_stream and buildTask.stream):
+                        driver.sendFrameworkMessage(
+                            str("%s: %s" % (image_name, message))
+                        )
 
             # Extract the newly created image ID
             match = re.search(r'built (.*)$', message)
@@ -208,7 +216,7 @@ class Executor(pesos.api.Executor):
 
             # Tag the image with all the required tags
             tags = buildTask.image.tag or ["latest"]
-            driver.send_framework_message(str("%s: Tagging image %s" % (image_name, image_id)))
+            driver.sendFrameworkMessage(str("%s: Tagging image %s" % (image_name, image_id)))
             for tag in tags:
                 try:
                     self.docker.tag(
@@ -217,25 +225,31 @@ class Executor(pesos.api.Executor):
                         tag=tag,
                         force=True
                     )
-                    driver.send_framework_message(str("%s:  ---> %s" % (image_name, tag)))
+                    driver.sendFrameworkMessage(str("%s:    -> %s" % (image_name, tag)))
                 except Exception, e:
                     raise e
 
             # Push the image to the registry
-            driver.send_framework_message("%s: Pushing image" % image_name)
+            driver.sendFrameworkMessage(str("%s: Pushing image" % image_name))
             push_request = self.docker.push(image_name, stream=True)
-            for message in self._wrap_docker_stream(push_request):
-                driver.send_framework_message(
-                    str("%s:  ---> %s" % (image_name, message))
-                )
+            for message, is_stream in self._wrap_docker_stream(push_request):
+                if not is_stream or (is_stream and buildTask.stream):
+                    driver.sendFrameworkMessage(
+                        str("%s: %s" % (image_name, message))
+                    )
 
-            driver.send_status_update(mesos_pb2.TaskStatus(
+            driver.sendStatusUpdate(mesos_pb2.TaskStatus(
                 task_id=taskInfo.task_id,
                 state=self.TASK_FINISHED
             ))
         except Exception, e:
             logger.error("Caught exception building image: %s", e)
-            driver.send_status_update(mesos_pb2.TaskStatus(
+            driver.sendStatusUpdate(mesos_pb2.TaskStatus(
                 task_id=taskInfo.task_id,
-                state=self.TASK_FAILED
+                state=self.TASK_FAILED,
+                message=str(e),
+                data=traceback.format_exc()
             ))
+
+            # Re-raise the exception for logging purposes and to terminate the thread
+            raise

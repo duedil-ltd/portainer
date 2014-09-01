@@ -1,5 +1,5 @@
 
-package ddocker;
+package portainer;
 
 /**
  * Provides the necessary values to build a docker image
@@ -9,6 +9,7 @@ package ddocker;
 message BuildTask {
     required DockerImage image = 1;
     optional string context = 2;
+    optional bool stream = 5; // Should we stream the build output?
 
     // These are used when launching/connecting to the docker daemon
     optional string docker_host = 3;

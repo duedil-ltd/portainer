@@ -6,9 +6,11 @@
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 
-REPOSITORY portainer/test
-BUILD_CPU 0.5
-BUILD_MEM 256
+REPOSITORY portainer/example
+BUILD_CPU 0.1
+BUILD_MEM 512
 
+ADD ../ /opt/portainer
 WORKDIR /opt/portainer
-ADD http://github.com/duedil-ltd/portainer/archive/master.zip /opt/portainer
+
+ENTRYPOINT bin/portainer

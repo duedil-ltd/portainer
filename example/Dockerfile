@@ -6,11 +6,18 @@
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 
-REPOSITORY portainer/example
+REPOSITORY tarnfeld/portainer
 BUILD_CPU 0.1
 BUILD_MEM 512
 
-ADD ../ /opt/portainer
-WORKDIR /opt/portainer
+# Install dependencies
+RUN apt-get update && apt-get install -y build-essential python-setuptools python-virtualenv
 
-ENTRYPOINT bin/portainer
+# Install the portainer source code
+ADD ../ /opt/portainer
+
+# Setup the python virtualenv
+RUN cd /opt/portainer && bin/setup
+
+WORKDIR /opt/portainer
+# ENTRYPOINT bin/portainer

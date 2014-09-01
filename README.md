@@ -30,14 +30,15 @@
                                |   (    )                   / /   \ \
 ```
 
-Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines. Given a valid `Dockerfile`, portainer can build your image and push it to a private registry faster than you can count to `n`.
+Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines. Given a valid `Dockerfile`, Portainer can build your image and push it to a private registry faster than you can count to `n`.
 
 When building docker images at scale, it can be time consuming and wasteful to manage dedicated infrastructure for building and pushing images. Building large containers with many sources and dependencies is a heavy operation, requiring large machines, and multiple of them. Deploying this infrastructure can be expensive and lead to poor utilization.
 
-Given an existing Apache Mesos cluster, portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](http://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](http://mesos.apache.org/gettingstarted/).
+Given an existing Apache Mesos cluster, Portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](http://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](http://mesos.apache.org/gettingstarted/).
 
-**Note: If you are _not_ using the Mesos/Docker containerizer introduced in 0.20.0, this framework will currently not work for you. There isn't any reason it can't be supported, I've just not put the time into doing it. Contributions welcome! :)**
+**Note: If you are _not_ using the External Containerizer + Docker integration (with [our containerizer](http://github.com/duedil-ltd/mesos-docker-containerizer)/[deimos](https://github.com/mesosphere/deimos)) this framework will not work for you as it stands. This also goes for the docker containerizer released in 0.20.0 as it does not support the `--privileged` option.**
 
+--------------------------------------------------------------------------------
 
 ## Features
 
@@ -45,13 +46,14 @@ Given an existing Apache Mesos cluster, portainer can get to work right away. If
 - Support for the new Docker containerizer in Mesos 0.20.0
 - Configurable CPU/Memory resource limits for build tasks
 - Full support for all `Dockerfile` commands, including local sources (e.g `ADD ./src`)
-- Capable of building many many images in parallel across the cluster
-- Introduces variables into the `Dockerfile` syntax for environment specific parameters
+- Capable of building many images in parallel across the cluster
+- Docker build logs are streamed from the Mesos slave for easy debugging and monitoring
 
 #### Not Supported
 
-- Completely untested with the **public docker image index**
+- Pushing built images to the public docker index
 
+--------------------------------------------------------------------------------
 
 ## Getting Started
 
@@ -64,31 +66,37 @@ You'll need to have the following dependencies installed to run the framework, t
 - **Protocol Buffers (`brew install protobuf`)**
 - Make
 
-
 ## Building Images
 
-#### 1. Upload the mesos executor
+#### 1. Upload the Mesos executor
 
-Before being able to use portainer, you need to upload the executor code for mesos to launch on the slave nodes. You can build it using `make executor`. If you have any changes locally, the script will exit and warn you before doing anything. The archive will be build into `./dist/` and needs to be uploaded somewhere mesos can reach it (HDFS, S3, FTP, HTTP etc).
+**Note: If the version of Portainer you are using is available as a [github release](http://github.com/duedil-ltd/portainer/releases) you can skip this step and use the github URL.**
 
-Once you've uploaded that to somewhere.. save the full URL for later.
+Before being able to use Portainer, you need to upload the executor code somewhere accessible by the Mesos slaves. You can build a tar archive using `make executor`. The archive will be dumped into `./dist/` and needs to be uploaded somewhere Mesos can reach it (HDFS, S3, FTP, HTTP etc).
 
 #### 2. Write your `Dockerfile`
 
-As mentioned above, the `Dockerfile`s used by portainer are almost identical to those used by docker itself. There are a few extra commands that can be used as metadata for portainer, one of which is required. If you are keen to avoid hard coding these values into your Dockerfile's themselves, you can specify them at runtime with command line flags.
+Portainer can work out of the box on existing `Dockerfile` files with no modifications. To do this, you _must_ specify a repository for your image, using `--repository duedil/portainer`.
 
-*Note: Adding these extra commands will **not** cause the `Dockerfile` to be unusable with the standard `docker build` command. They will simply be ignored.*
+You must also specify a private registry to push the image to once successfully built, using `--to my.registry:1234`.
 
-- `REGISTRY`    / `--registry` - The docker registry to push the image to once built
-- `REPOSITORY`  / `--repository` - The name of the image repository (i.e `duedil-ltd/portainer` (**required**))
-- `BUILD_CPU`   / `--build-cpu` - The number of CPUs required to build the image (a float)
-- `BUILD_MEM`   / `--build-mem` - The amount of memory required to build the image (int, in megabytes)
+If your `Dockerfile` is based upon a private image (in the `FROM` instruction) not available in the public docker index, you can use the `--from my.registry:1234` argument to configure where dependent images are pulled from. It is worth noting that when `--from` is used, all images are pulled from the given registry, and the public index is **never** used. This can be useful to mirroring public images and avoid being dependent on the public index.
 
-For an example, take a look at the `Dockerfile` provided in the `./example` folder. This can be used to build an image of the portainer source code.
+Since Mesos is based around the concept of _Resources_, build tasks need some CPU and Memory to be able to execute. Defaults are provided, but the `--build-cpu` and `--build-mem` command line flags can be used to configure the resource allocation used.
+
+--------------------------------------------------------------------------------
+
+As mentioned above, Portainer supports a set of custom `Dockerfile` instructions. These are safe to use with the standard `docker build` tool as they will simply be ignored.
+
+- `REPOSITORY`  / `--repository` - The name of the image repository (string, e.g `duedil-ltd/portainer`)
+- `BUILD_CPU`   / `--build-cpu` - The number of CPUs required to build the image (`float`)
+- `BUILD_MEM`   / `--build-mem` - The amount of memory required to build the image (`integer`, in megabytes)
+
+For an example, take a look at the `Dockerfile` provided in the `./example` folder. This can be used to build an image of the Portainer source code.
 
 #### 3. Local `ADD` sources
 
-If your `Dockerfile` (like the example provided) contains no `ADD` commands that use local files (`http://` is fine), you can skip this step entirely. If you do use local sources, continue reading.
+If your `Dockerfile` does not container any `ADD` commands that use local files, you can skip this step entirely. If you do use local sources, continue reading. Additional configuration is required.
 
 Docker provides a way of bundling up local sources into the image being built, using the `ADD` command. For example;
 
@@ -96,46 +104,23 @@ Docker provides a way of bundling up local sources into the image being built, u
 ADD ./src /usr/lib/my-src
 ```
 
-Since portainer will build your image on a remote machine, it has the ability to automatically discover these local sources, bundle them up, and upload them with the task. You can use any filesystem supported by [`pyfs`](github.com/duedil-ltd/pyfilesystem), including HDFS and S3. If you're using S3 you will need to configure the correct environment variables for authentication, being `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+Since Portainer will build your image on a remote machine, it has to bundle and upload these local sources, so they to be used remotely when building the image. You can use any filesystem supported by [`pyfs`](github.com/duedil-ltd/pyfilesystem), including HDFS and S3. If you're using S3 you will need to configure the correct environment variables for authentication, being `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
 Use the `--staging-uri` command line flag to specify this. For example to distribute sources using your HDFS cluster, `--staging-uri=hdfs://my.namenode:50070/tmp/portainer`.
 
-*Note: Portainer imposes no restrictions on symlinks or relative paths in `ADD` commands, unlike docker. In some situations this can pose security issues if building `Dockerfile`s from untrusted sources. Portainer and the mesos executor will only have access to files readable to the user it's running as, so don't run as `root`.*
+*Note: Portainer imposes no restrictions on symlinks or relative paths in `ADD` instructions, unlike docker. In some situations this can pose security issues if building images from `Dockerfile` files from untrusted sources. Portainer and the Mesos executor will only have access to files readable to the user it's running as, so don't run the framework as `root`.*
 
-#### 5. Variables
+#### 4. Launch Portainer
 
-For re-usability, it can be valuable to replace certain values in your `Dockerfile` with runtime variables. An example being, if you have the same image pushed to multiple registries, hardcoding the `FROM` value to include a single private registry is an issue.
-
-Currently one variable is provided built-in, `%REGISTRY%`. This will be populated with the private registry the image would be **pushed** to. Here's an example use case...
-
-**foo/Dockerfile**
+Now that you've got everything set up, you're  good to go. Because Portainer uses a pure-python implementation of the Mesos Framework API ([called pesos](http://github.com/wickman/pesos)), there is no requirement to install Apache Mesos itself to run the framework. You can use the invocation below as an example.
 
 ```
-REPOSITORY test/foo
-FROM ubuntu
-RUN apt-get install htop
-```
-
-**bar/Dockerfile**
-
-```
-REPOSITORY test/bar
-FROM %REGISTRY%/test/foo
-RUN apt-get install something-else
-```
-
-With these two `Dockerfile` files, you can build the tree of images and push them to multiple registries easily, using the `--registry` command line flag.
-
-
-#### 4. Launch portainer
-
-Now that you've got everything set up, you should be good to go. Because portainer uses a pure-python implementation of the Mesos Framework API ([called pesos](http://github.com/wickman/pesos)) there is no requirement to install mesos itself.
-
-```
-$ cd portainer
-$ ./bin/portainer example/Dockerfile.in \
+$ cd Portainer
+$ ./bin/portainer \
         --mesos-master "localhost:5050" \
-        --executor-uri "hdfs:///path/to/portainer-executor.tar.gz" \
-        --tag "latest" \
-        --tag "something_else"
+        --executor-uri "hdfs://my-namenode/path/to/portainer-executor.tar.gz" \
+        --staging-uri "hdfs://my-namenode/tmp/portainer" \
+        --tag "my_custom_tag" \
+        --to "my-registry:5000" \
+        example/Dockerfile
 ```

@@ -126,3 +126,7 @@ $ ./bin/portainer \
         --to "my-registry:5000" \
         example/Dockerfile
 ```
+
+##### Debugging
+
+To aid debugging, any exceptions thrown while building the docker image will be relayed back to the framework and printed out. If you want to keep an eye on the output of all `RUN` commands docker is executing while building your images, add the `--stream` argument and all stdout/stderr logs will be streamed to the framework.

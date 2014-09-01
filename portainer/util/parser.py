@@ -98,7 +98,7 @@ class Dockerfile(object):
     def has_local_sources(self):
         return len(
             filter(
-                lambda (src, dst): src.startswith("http"),
+                lambda (src, dst): not src.startswith("http"),
                 self.get("ADD")
             )
         ) > 0

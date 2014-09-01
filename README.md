@@ -120,6 +120,7 @@ $ cd Portainer
 $ ./bin/portainer \
         --mesos-master "localhost:5050" \
         --executor-uri "hdfs://my-namenode/path/to/portainer-executor.tar.gz" \
+        build \
         --staging-uri "hdfs://my-namenode/tmp/portainer" \
         --tag "my_custom_tag" \
         --to "my-registry:5000" \

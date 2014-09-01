@@ -63,7 +63,7 @@ Given an existing Apache Mesos cluster, Portainer can get to work right away. If
 You'll need to have the following dependencies installed to run the framework, though it's likely you'll only need to install the ones highlighted in bold;
 
 - Python 2.7
-- **Python `virtualenv`**
+- **Python `virtualenv` and `pip`**
 - **Protocol Buffers (`brew install protobuf`)**
 - Make
 

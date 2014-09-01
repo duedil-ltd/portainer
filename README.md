@@ -45,7 +45,6 @@ Given an existing Apache Mesos cluster, Portainer can get to work right away. If
 ## Features
 
 - Works out of the box with existing `Dockerfile` files
-- Support for the new Docker containerizer in Mesos 0.20.0
 - Configurable CPU/Memory resource limits for build tasks
 - Full support for all `Dockerfile` commands, including local sources (e.g `ADD ./src`)
 - Capable of building many images in parallel across the cluster

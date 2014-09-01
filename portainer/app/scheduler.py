@@ -202,9 +202,9 @@ class Scheduler(mesos.interface.Scheduler):
 
     def framework_message(self, driver, executorId, slaveId, message):
         if "Buffering" in message:  # Heh. This'll do for now, eh?
-            logger.debug(message)
+            logger.debug("\t%s", message)
         else:
-            logger.info(message)
+            logger.info("\t%s", message)
 
     def _prepare_task(self, driver, path, dockerfile, tags, offer, cpu, mem):
         """Prepare a given dockerfile build task atop the given mesos offer."""

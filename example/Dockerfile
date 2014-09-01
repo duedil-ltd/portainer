@@ -11,13 +11,13 @@ BUILD_CPU 0.1
 BUILD_MEM 512
 
 # Install dependencies
-RUN apt-get update && apt-get install -y build-essential python-setuptools python-virtualenv
+RUN apt-get update && apt-get install -y build-essential git python-setuptools python-virtualenv
 
 # Install the portainer source code
 ADD ../ /opt/portainer
 
 # Setup the python virtualenv
-RUN cd /opt/portainer && bin/setup
+RUN cd /opt/portainer && rm -rf bin/env && bin/setup
 
 WORKDIR /opt/portainer
-# ENTRYPOINT bin/portainer
+ENTRYPOINT bin/portainer

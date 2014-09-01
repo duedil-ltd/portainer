@@ -1,4 +1,8 @@
 
+# Portainer
+
+Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines. Given a valid `Dockerfile`, Portainer can build your image and push it to a private registry faster than you can count to `n`.
+
 ```
                    .,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.
                    ,                          .,
@@ -29,8 +33,6 @@
                                |    )  (                     _\___/_
                                |   (    )                   / /   \ \
 ```
-
-Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines. Given a valid `Dockerfile`, Portainer can build your image and push it to a private registry faster than you can count to `n`.
 
 When building docker images at scale, it can be time consuming and wasteful to manage dedicated infrastructure for building and pushing images. Building large containers with many sources and dependencies is a heavy operation, requiring large machines, and multiple of them. Deploying this infrastructure can be expensive and lead to poor utilization.
 
@@ -88,7 +90,7 @@ Since Mesos is based around the concept of _Resources_, build tasks need some CP
 
 As mentioned above, Portainer supports a set of custom `Dockerfile` instructions. These are safe to use with the standard `docker build` tool as they will simply be ignored.
 
-- `REPOSITORY`  / `--repository` - The name of the image repository (string, e.g `duedil-ltd/portainer`)
+- `REPOSITORY`  / `--repository` - The name of the image repository (`string`)
 - `BUILD_CPU`   / `--build-cpu` - The number of CPUs required to build the image (`float`)
 - `BUILD_MEM`   / `--build-mem` - The amount of memory required to build the image (`integer`, in megabytes)
 

@@ -16,4 +16,4 @@ cd $(dirname $(dirname "$0"))
 source ./bin/env/bin/activate
 export PYTHONPATH="`pwd`/src:$PYTHONPATH"
 
-python2.7 -m ddocker.app.__main__ "$@"
+python2.7 -m portainer.app.__main__ "$@"

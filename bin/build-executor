@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 #
-# Script for building the ddocker executor tar file. This script will generate
-# a file in ../dist/ddocker-{git hash}.tar.gz to be uploaded to somewhere accessible
+# Script for building the portainer executor tar file. This script will generate
+# a file in ../dist/portainer-{git hash}.tar.gz to be uploaded to somewhere accessible
 # from your mesos cluster.
 # 
 # If you have uncommitted changes, the script will do nothing with the FORCE
@@ -24,7 +24,7 @@ fi
 # Figure out the git revision
 GIT_REV=$(git rev-parse HEAD)
 SOURCE_DIR=$(pwd)
-TAR_NAME="ddocker-$GIT_REV"
+TAR_NAME="portainer-$GIT_REV"
 TMP_DIR=$(mktemp -d -t XXXXXX)
 
 echo "Using temporary directory $TMP_DIR"

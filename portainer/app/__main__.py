@@ -4,16 +4,16 @@
 import logging
 import sys
 
-from ddocker.app import parser
+from portainer.app import parser
 
 # Import all the commands
-import ddocker.app.build
-import ddocker.app.executor
+import portainer.app.build
+import portainer.app.executor
 
 
 def main(argv):
 
-    parser.prog = "ddocker"
+    parser.prog = "portainer"
 
     # Arguments for mesos
     group = parser.add_argument_group("mesos")
@@ -38,7 +38,7 @@ def main(argv):
     formatter = logging.Formatter(fmt="%(asctime)s[%(name)s] %(message)s")
     handler.setFormatter(formatter)
 
-    for logger in ("ddocker.build", "ddocker.scheduler", "ddocker.executor", "pesos",
+    for logger in ("portainer.build", "portainer.scheduler", "portainer.executor", "pesos",
                    "compactor", "tornado"):
         logger = logging.getLogger(logger)
         logger.propagate = False

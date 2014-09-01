@@ -7,10 +7,10 @@ DOT := \033[34m●\033[39m
 TICK := \033[32m✔\033[39m
 
 clean-py:
-	find ./src/ddocker -name "*.py[co]" -exec rm {} \;
+	find ./portainer -name "*.py[co]" -exec rm {} \;
 
 clean-proto:
-	rm -rf ./src/ddocker/proto/*_pb2.py
+	rm -rf ./portainer/proto/*_pb2.py
 
 clean-dist:
 	rm -rf ./dist
@@ -20,7 +20,7 @@ clean-env:
 
 protobuf: clean-proto
 	@echo "$(DOT) Building python proto modules."
-	protoc ./proto/*.proto --python_out=./src/ddocker/
+	protoc ./proto/*.proto --python_out=./portainer/
 	@echo "$(TICK) Building python proto modules."
 
 env:

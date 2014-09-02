@@ -364,7 +364,7 @@ class Scheduler(mesos.interface.Scheduler):
                 local_path = os.path.abspath(local_path)
 
                 # Maintain a set of globs to ignore
-                ignore = {os.path.join(local_path, ".dockerignore")}
+                ignore = set()
 
                 for (dirpath, _, filenames) in os.walk(local_path, followlinks=True):
 

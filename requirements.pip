@@ -1,6 +1,6 @@
 git+git://github.com/duedil-ltd/tornado.git@1ceefdd89be8c3df217d79e0faa2d1948a231646#egg=tornado
 git+git://github.com/wickman/compactor.git@0a16c6f8af55171d46cc03d4abfa4e3d5ef8ea38#egg=compactor
-git+git://github.com/tarnfeld/pesos.git@1de2b6c68fab2074433b90b09b927634a30f623c#egg=pesos
+git+git://github.com/tarnfeld/pesos.git@f2a89b4576dc9435bbb82316f62e9b800d791c17#egg=pesos
 git+git://github.com/duedil-ltd/pyfilesystem.git@1c5ca47e0e8dd58ed77f3cae62d5246203bc74dd#egg=fs
 trollius==0.4
 protobuf==2.5.0

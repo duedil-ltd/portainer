@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y build-essential git python-setuptools p
 ADD ../ /opt/portainer
 
 # Setup the python virtualenv
-RUN cd /opt/portainer && rm -rf bin/env && bin/setup
+RUN cd /opt/portainer && bin/setup
 
 WORKDIR /opt/portainer
 ENTRYPOINT bin/portainer

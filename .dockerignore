@@ -2,3 +2,4 @@
 bin/env
 .vagrant
 dist/
+*.pyc

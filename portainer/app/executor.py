@@ -171,6 +171,9 @@ class Executor(mesos.interface.Executor):
         ))
 
         try:
+            if not buildTask:
+                raise Exception("Failed to decode the BuildTask protobuf data")
+
             if not buildTask.context and not buildTask.dockerfile:
                 raise Exception("Either a build context or dockerfile is required")
 

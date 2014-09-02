@@ -49,6 +49,7 @@ Given an existing Apache Mesos cluster, Portainer can get to work right away. If
 - Full support for all `Dockerfile` commands, including local sources (e.g `ADD ./src`)
 - Capable of building many images in parallel across the cluster
 - Docker build logs are streamed from the Mesos slave for easy debugging and monitoring
+- Support for the `.dockerignore` file
 
 #### Not Supported
 

@@ -18,6 +18,3 @@ ADD ../ /opt/portainer
 
 # Setup the python virtualenv
 RUN cd /opt/portainer && bin/setup
-
-WORKDIR /opt/portainer
-ENTRYPOINT bin/portainer

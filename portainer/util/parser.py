@@ -26,6 +26,15 @@ def parse_dockerfile(path, **kwargs):
     return dockerfile
 
 
+def parse_dockerignore(ignore_file):
+    """Return a generator of glob patterns to ignore."""
+
+    for line in ignore_file:
+        line = line.strip()
+        if line and not line.startswith("#"):
+            yield line
+
+
 class Dockerfile(object):
     """Model to represent a parse Dockerfile.
 

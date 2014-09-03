@@ -18,7 +18,7 @@ from pesos.vendor.mesos import mesos_pb2
 from urlparse import urlparse
 
 from portainer.proto import portainer_pb2
-from portainer.util.parser import parse_dockerfile
+from portainer.util.parser import parse_dockerfile, parse_dockerignore
 
 logger = logging.getLogger("portainer.scheduler")
 
@@ -364,36 +364,40 @@ class Scheduler(mesos.interface.Scheduler):
 
                 # TODO(tarnfeld): This isn't strict enough
                 if local_path.startswith("http"):
+                    logger.debug("Skipping remote ADD %s", local_path)
                     continue
 
                 if not local_path.startswith("/"):
                     local_path = os.path.join(context_root, local_path)
                 local_path = os.path.abspath(local_path)
 
-                # Maintain a set of globs to ignore
-                ignore = set()
+                if os.path.isfile(local_path):
+                    # Preserve the file extension
+                    parts = local_path.split(".")
+                    if len(parts) > 1:
+                        tar_path += "." + parts[-1]
+                    logger.debug("Adding path %s to tar in %s", local_path, tar_path)
+                    tar.add(local_path, arcname=tar_path)
+                else:
+                    ignore = set()
+                    for (dirpath, _, filenames) in os.walk(local_path, followlinks=True):
+                        # Update the set of ignored paths with any new .dockerignore files we see
+                        ignore_path = os.path.join(dirpath, ".dockerignore")
+                        if os.path.exists(ignore_path):
+                            with open(ignore_path, 'r') as f:
+                                for glob in parse_dockerignore(f):
+                                    ignore.add(os.path.join(dirpath, glob) + "*")
 
-                for (dirpath, _, filenames) in os.walk(local_path, followlinks=True):
-
-                    # Update the set of ignored paths with any new .dockerignore files we see
-                    ignore_path = os.path.join(dirpath, ".dockerignore")
-                    if os.path.exists(ignore_path):
-                        with open(ignore_path, 'r') as f:
-                            for line in f:
-                                line = line.strip()
-                                if line and not line.startswith("#"):
-                                    ignore.add(os.path.join(dirpath, line) + "*")
-
-                    for filename in filenames:
-                        path = os.path.join(dirpath, filename)
-                        for expr in ignore:
-                            if fnmatch(path, expr):
-                                logger.debug("Ignoring path %s", path)
-                                break
-                        else:
-                            rel_path = path.replace(local_path, '').lstrip('/')
-                            logger.debug("Adding path %s to tar in %s", rel_path, tar_path)
-                            tar.add(path, arcname=os.path.join(tar_path, rel_path))
+                        for filename in filenames:
+                            path = os.path.join(dirpath, filename)
+                            for expr in ignore:
+                                if fnmatch(path, expr):
+                                    logger.debug("Ignoring path %s", path)
+                                    break
+                            else:
+                                rel_path = path.replace(local_path, '').lstrip('/')
+                                logger.debug("Adding path %s to tar in %s", rel_path, tar_path)
+                                tar.add(path, arcname=os.path.join(tar_path, rel_path))
 
                 dockerfile.instructions[idx] = (cmd, (tar_path, remote_path))
 

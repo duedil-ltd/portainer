@@ -245,11 +245,18 @@ class Scheduler(mesos.interface.Scheduler):
             # Upload the build context (+ fancy progress bar)
             logger.info("Uploading context (%d bytes)", context_size)
             pbar = progressbar.ProgressBar(maxval=context_size, term_width=100)
+
+            # Define a custom error handler for the async upload
+            def handle_exception(e):
+                logger.error("Caught exception uploading the context")
+                raise e
+
             event = self.filesystem.setcontents_async(
                 path=staging_context_path,
                 data=context,
                 progress_callback=pbar.update,
-                finished_callback=pbar.finish
+                finished_callback=pbar.finish,
+                error_callback=handle_exception
             )
 
             # Hold up, let's wait until the upload finishes

@@ -49,6 +49,7 @@ class Scheduler(mesos.interface.Scheduler):
         self.pending = len(self.queued_tasks)
         self.running = 0
         self.finished = 0
+        self.failed = 0
         self.task_ids = {}
 
         self.processing_offers = threading.Lock()
@@ -164,7 +165,8 @@ class Scheduler(mesos.interface.Scheduler):
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""
 
-        done = False
+        finished = False
+        failed = False
         task_id = None
 
         if update.task_id.value in self.task_ids:
@@ -182,24 +184,25 @@ class Scheduler(mesos.interface.Scheduler):
             logger.info("Task update %s : FAILED", task_id)
             if update.message and update.data:
                 logger.info("Exception caught while building image: \n\n%s", update.data)
-            done = True
+            failed = True
         elif update.state == mesos_pb2.TASK_FINISHED:
             logger.info("Task update %s : FINISHED", task_id)
-            done = True
+            finished = True
         elif update.state == mesos_pb2.TASK_KILLED:
             logger.info("Task update %s : KILLED", task_id)
-            done = True
+            failed = True
         elif update.state == mesos_pb2.TASK_LOST:
             logger.info("Task update %s : LOST", task_id)
-            done = True
+            failed = True
 
-        # If the status update is terminal, go ahead and mark the task as done
-        if done:
+        if finished:
             self.running -= 1
             self.finished += 1
+        elif failed:
+            self.running -= 1
+            self.failed += 1
 
-        # If there are no tasks running, and the queue is empty, it should be
-        # save to quit.
+        # If there are no tasks running, and the queue is empty, we should stop
         if self.running == 0 and self.pending == 0:
             driver.stop()
 

@@ -84,3 +84,11 @@ def main(args):
     # Wait here until the tasks are done
     while thread.isAlive():
         time.sleep(0.5)
+
+    # Check to see if any of the tasks failed
+    if scheduler.failed > 0:
+        logger.error("%d images failed to build", scheduler.failed)
+        sys.exit(1)
+    else:
+        logger.error("Successfully built %d images", scheduler.finished)
+        sys.exit(0)

@@ -3,6 +3,8 @@
 
 Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines. Given a valid `Dockerfile`, Portainer can build your image and push it to a private registry faster than you can count to `n`.
 
+[![](http://img.shields.io/badge/duedil-hiring-green.svg)](http://duedil.careers/)
+
 ```
                    .,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.
                    ,                          .,

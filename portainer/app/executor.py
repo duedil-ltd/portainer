@@ -3,17 +3,18 @@
 
 import docker
 import functools
+import io
 import json
 import logging
 import mesos.interface
-import pesos.executor
 import os
+import pesos.executor
+import re
+import signal
+import subprocess
 import threading
 import time
-import re
-import subprocess
 import traceback
-import io
 
 from pesos.vendor.mesos import mesos_pb2
 

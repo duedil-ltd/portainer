@@ -119,7 +119,7 @@ class Executor(mesos.interface.Executor):
             try:
                 docker_pid = int(open("/var/run/docker.pid", "r").read())
                 os.kill(docker_pid, signal.SIGTERM)
-            except e:
+            except Exception, e:
                 logger.error("Caught exception killing docker daemon")
                 logger.error(e)
         else:

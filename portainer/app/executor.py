@@ -93,10 +93,10 @@ class Executor(mesos.interface.Executor):
             self.docker_daemon_up = True
 
     def disconnected(self, driver):
-        log.info("Disconnected from master! Ahh!")
+        logger.info("Disconnected from master! Ahh!")
 
     def reregistered(self, driver, slaveInfo):
-        log.info("Re-registered from the master! Ahh!")
+        logger.info("Re-registered from the master! Ahh!")
 
     def launchTask(self, driver, taskInfo):
 
@@ -114,16 +114,16 @@ class Executor(mesos.interface.Executor):
         thread.start()
 
     def shutdown(self, driver):
-        log.info("Shutting down the executor")
+        logger.info("Shutting down the executor")
         if os.path.exists("/var/run/docker.pid"):
             try:
                 docker_pid = int(open("/var/run/docker.pid", "r").read())
                 os.kill(docker_pid, signal.SIGTERM)
             except e:
-                log.error("Caught exception killing docker daemon")
-                log.error(e)
+                logger.error("Caught exception killing docker daemon")
+                logger.error(e)
         else:
-            log.warning("Unable to locate docker pidfile")
+            logger.warning("Unable to locate docker pidfile")
 
     def _wrap_docker_stream(self, stream):
         """Wrapper to parse the different types of messages from the

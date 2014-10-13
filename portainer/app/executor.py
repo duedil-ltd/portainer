@@ -70,7 +70,6 @@ class Executor(mesos.interface.Executor):
 
             # TODO(tarnfeld): This should be made a little more flexible
             proc = subprocess.Popen(["/usr/local/bin/wrapdocker"])
-            # os.environ["MESOS_DIRECTORY"]
 
             self.docker = docker.Client()
             while True:
@@ -113,6 +112,18 @@ class Executor(mesos.interface.Executor):
 
         thread.setDaemon(True)
         thread.start()
+
+    def shutdown(self, driver):
+        log.info("Shutting down the executor")
+        if os.path.exists("/var/run/docker.pid"):
+            try:
+                docker_pid = int(open("/var/run/docker.pid", "r").read())
+                os.kill(docker_pid, signal.SIGTERM)
+            except e:
+                log.error("Caught exception killing docker daemon")
+                log.error(e)
+        else:
+            log.warning("Unable to locate docker pidfile")
 
     def _wrap_docker_stream(self, stream):
         """Wrapper to parse the different types of messages from the

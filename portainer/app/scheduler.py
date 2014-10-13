@@ -102,11 +102,11 @@ class Scheduler(mesos.interface.Scheduler):
 
         # We only want to process offers one set at a time
         with self.processing_offers:
-            decline_offers = []
             tasks_to_launch = []
 
             if not self.pending:
-                decline_offers = [offer.id for offer in offers]
+                for offer in offers:
+                    driver.declineOffer(offer.id)
             else:
                 for offer in offers:
                     offer_cpu = 0.0
@@ -136,13 +136,10 @@ class Scheduler(mesos.interface.Scheduler):
                             break
                     else:
                         logger.debug("Ignoring offer %r", offer)
-                        decline_offers.append(offer.id)
+                        driver.declineOffer(offer.id)
 
                     # Remove all of the tasks that are about to be launched
                     self.queued_tasks = filter(None, self.queued_tasks)
-
-            if decline_offers:
-                driver.declineOffer(decline_offers)
 
             # Launch the build tasks on the mesos cluster
             for offer, path, dockerfile, tags, cpu, mem in tasks_to_launch:

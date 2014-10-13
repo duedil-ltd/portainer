@@ -171,17 +171,22 @@ class Executor(mesos.interface.Executor):
 
         logger.info("Waiting for docker daemon to be available")
 
-        # Wait for the docker daemon to be ready
-        while not self.docker_daemon_up:
+        # Wait for the docker daemon to be ready (up to 30 seconds)
+        timeout = 30
+        while timeout > 1 and not self.docker_daemon_up:
+            timeout -= 1
             time.sleep(1)
 
-        # Now that docker is up, let's go and do stuff
-        driver.sendStatusUpdate(mesos_pb2.TaskStatus(
-            task_id=taskInfo.task_id,
-            state=self.TASK_RUNNING
-        ))
-
         try:
+            if not self.docker_daemon_up:
+                raise Exception("Timed out waiting for docker daemon")
+
+            # Now that docker is up, let's go and do stuff
+            driver.sendStatusUpdate(mesos_pb2.TaskStatus(
+                task_id=taskInfo.task_id,
+                state=self.TASK_RUNNING
+            ))
+
             if not buildTask:
                 raise Exception("Failed to decode the BuildTask protobuf data")
 

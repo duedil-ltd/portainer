@@ -103,6 +103,7 @@ class Scheduler(mesos.interface.Scheduler):
         # We only want to process offers one set at a time
         with self.processing_offers:
             decline_offers = []
+            launch_offers = []
 
             if not self.pending:
                 decline_offers = [offer.id for offer in offers]
@@ -120,7 +121,7 @@ class Scheduler(mesos.interface.Scheduler):
                     logger.debug("Received offer for cpus:%f mem:%d", offer_cpu, offer_mem)
 
                     # Look for a task in the queue that fits the bill
-                    to_launch = []
+                    decline_offer = True
                     for idx, (path, dockerfile, tags) in enumerate(self.queued_tasks):
                         cpu = float(dockerfile.get("BUILD_CPU", [self.cpu]).next()[0])
                         mem = int(dockerfile.get("BUILD_MEM", [self.mem]).next()[0])
@@ -128,39 +129,41 @@ class Scheduler(mesos.interface.Scheduler):
                         if cpu > offer_cpu:
                             break
                         if mem <= offer_mem:
-                            to_launch.append((idx, cpu, mem))
+                            decline_offer = False
+                            launch_offers.append((offer, idx, cpu, mem))
                             break  # TODO: No support for multiple tasks per offer yet
 
-                    if to_launch:
-                        tasks = []
-                        task_queue = list(self.queued_tasks)
-
-                        for idx, cpu, mem in to_launch:
-                            path, dockerfile, tgs = task_queue[idx]
-                            task_queue[idx] = None  # Null out the value to be removed later
-
-                            tasks.append(self._prepare_task(
-                                driver=driver,
-                                path=path,
-                                dockerfile=dockerfile,
-                                tags=tags,
-                                offer=offer,
-                                cpu=cpu,
-                                mem=mem
-                            ))
-
-                        self.queued_tasks = filter(None, task_queue)
-                        self.pending -= len(tasks)
-                        self.running += len(tasks)
-
-                        logger.info("Launching %d tasks", len(tasks))
-                        driver.launchTasks(offer.id, tasks)
-                    else:
+                    if decline_offer:
                         logger.debug("Ignoring offer %r", offer)
                         decline_offers.append(offer.id)
 
             if decline_offers:
                 driver.declineOffer(decline_offers)
+
+            if launch_offers:
+                tasks = []
+                task_queue = list(self.queued_tasks)
+
+                for offer, idx, cpu, mem in launch_offers:
+                    path, dockerfile, tags = task_queue[idx]
+                    task_queue[idx] = None  # Null out the value to be removed later
+
+                    tasks.append(self._prepare_task(
+                        driver=driver,
+                        path=path,
+                        dockerfile=dockerfile,
+                        tags=tags,
+                        offer=offer,
+                        cpu=cpu,
+                        mem=mem
+                    ))
+
+                self.queued_tasks = filter(None, task_queue)
+                self.pending -= len(tasks)
+                self.running += len(tasks)
+
+                logger.info("Launching %d tasks", len(tasks))
+                driver.launchTasks(offer.id, tasks)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""

@@ -153,9 +153,13 @@ class Scheduler(mesos.interface.Scheduler):
 
             # Launch the build tasks on the mesos cluster
             for offer, path, dockerfile, tags, cpu, mem in tasks_to_launch:
+                # Generate a task ID
+                task_id = str(uuid.uuid1())
+
                 try:
                     tasks = [self._prepare_task(
                         driver=driver,
+                        task_id=task_id,
                         path=path,
                         dockerfile=dockerfile,
                         tags=tags,
@@ -221,11 +225,9 @@ class Scheduler(mesos.interface.Scheduler):
         else:
             logger.info("\t%s", message)
 
-    def _prepare_task(self, driver, path, dockerfile, tags, offer, cpu, mem):
+    def _prepare_task(self, driver, task_id, path, dockerfile, tags, offer, cpu, mem):
         """Prepare a given dockerfile build task atop the given mesos offer."""
 
-        # Generate a task ID
-        task_id = str(uuid.uuid1())
         logger.info("Preparing task %s to build %s", task_id, path)
 
         # Define the build that's required

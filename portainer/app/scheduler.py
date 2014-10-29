@@ -52,7 +52,7 @@ class Scheduler(mesos.interface.Scheduler):
         self.failed = 0
         self.task_ids = {}
 
-        self.processing_offers = threading.Lock()
+        self._processing_offers = threading.Lock()
 
         # Ensure the staging directory exists
         self.filesystem = None
@@ -101,7 +101,7 @@ class Scheduler(mesos.interface.Scheduler):
     def _handle_offers(self, driver, offers):
 
         # We only want to process offers one set at a time
-        with self.processing_offers:
+        with self._processing_offers:
             tasks_to_launch = []
 
             if not self.pending:

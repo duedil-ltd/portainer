@@ -5,10 +5,12 @@ import logging
 import os
 import mesos.interface
 import progressbar
+import sys
 import StringIO
 import tarfile
 import tempfile
 import threading
+import traceback
 import uuid
 
 from fnmatch import fnmatch
@@ -22,6 +24,11 @@ from portainer.util.parser import parse_dockerfile, parse_dockerignore
 
 logger = logging.getLogger("portainer.scheduler")
 
+class TaskContextException(Exception):
+    pass
+
+class StagingSystemRequiredException(Exception):
+    pass
 
 class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
@@ -143,15 +150,20 @@ class Scheduler(mesos.interface.Scheduler):
 
             # Launch the build tasks on the mesos cluster
             for offer, path, dockerfile, tags, cpu, mem in tasks_to_launch:
-                tasks = [self._prepare_task(
-                    driver=driver,
-                    path=path,
-                    dockerfile=dockerfile,
-                    tags=tags,
-                    offer=offer,
-                    cpu=cpu,
-                    mem=mem
-                )]
+                try:
+                    tasks = [self._prepare_task(
+                        driver=driver,
+                        path=path,
+                        dockerfile=dockerfile,
+                        tags=tags,
+                        offer=offer,
+                        cpu=cpu,
+                        mem=mem
+                    )]
+                except TaskContextException as e:
+                    logger.error(e.message)
+                except StagingSystemRequiredException as e:
+                    logger.error(e.message)
 
                 logger.info("Launching %d tasks", len(tasks))
                 driver.launchTasks(offer.id, tasks)
@@ -247,7 +259,9 @@ class Scheduler(mesos.interface.Scheduler):
             caught_exception = threading.Event()
 
             def handle_exception(e):
-                logger.error("Caught exception uploading the context")
+                (_, _, tb) = sys.exc_info()
+                logger.error("Caught exception uploading the context: %s" % e.message)
+                logger.error(traceback.format_exc(tb))
                 caught_exception.set()
                 raise e
 
@@ -269,7 +283,7 @@ class Scheduler(mesos.interface.Scheduler):
 
             # Check to see if we caught any exceptions while uploading the context
             if caught_exception.is_set():
-                raise Exception("Exception raised while uploading context")
+                raise TaskContextException("Exception raised while uploading context")
 
             build_task.context = context_filename
         else:
@@ -358,7 +372,7 @@ class Scheduler(mesos.interface.Scheduler):
         """Generate and return a compressed tar archive of the build context."""
 
         if not self.filesystem:
-            raise Exception("A staging filesystem is required for local sources")
+            raise StagingSystemRequiredException("A staging filesystem is required for local sources")
 
         tar = tarfile.open(mode="w:gz", fileobj=output)
         for idx, (cmd, instruction) in enumerate(dockerfile.instructions):

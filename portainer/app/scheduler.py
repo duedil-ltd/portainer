@@ -168,12 +168,26 @@ class Scheduler(mesos.interface.Scheduler):
                         mem=mem
                     )]
                 except TaskContextException as e:
-                    logger.error(e.message)
+                    logger.error("Caught exception: %s", e.message)
+                    self.failed += 1
+                    self.running -= 1
+                    tasks = []
                 except StagingSystemRequiredException as e:
-                    logger.error(e.message)
+                    logger.error("Caught exception: %s", e.message)
+                    self.failed += 1
+                    self.running -= 1
+                    tasks = []
 
-                logger.info("Launching %d tasks", len(tasks))
-                driver.launchTasks(offer.id, tasks)
+                if not tasks:
+                    logger.error("Task %s failed to launch", task_id)
+
+                    # If there's no pending tasks or any tasks running, stop
+                    # the driver.
+                    if (self.pending + self.running) == 0:
+                        driver.stop()
+                else:
+                    logger.info("Launching %d tasks", len(tasks))
+                    driver.launchTasks(offer.id, tasks)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""

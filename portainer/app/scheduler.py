@@ -24,11 +24,14 @@ from portainer.util.parser import parse_dockerfile, parse_dockerignore
 
 logger = logging.getLogger("portainer.scheduler")
 
+
 class TaskContextException(Exception):
     pass
 
+
 class StagingSystemRequiredException(Exception):
     pass
+
 
 class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""

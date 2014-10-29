@@ -282,7 +282,6 @@ class Scheduler(mesos.interface.Scheduler):
                 logger.error("Caught exception uploading the context: %s" % e.message)
                 logger.error(traceback.format_exc(tb))
                 caught_exception.set()
-                raise e
 
             event = self.filesystem.setcontents_async(
                 path=staging_context_path,

@@ -16,6 +16,7 @@ from functools import partial
 from fs.opener import opener
 from pesos.vendor.mesos import mesos_pb2
 from urlparse import urlparse
+from Queue import Queue
 
 from portainer.proto import portainer_pb2
 from portainer.util.parser import parse_dockerfile, parse_dockerignore
@@ -69,6 +70,9 @@ class Scheduler(mesos.interface.Scheduler):
             )
 
             self.filesystem = opener.opendir(self.staging_uri)
+
+        self.cleanup = TaskCleanupThread(self.filesystem)
+        self.cleanup.start()
 
     def registered(self, driver, frameworkId, masterInfo):
         host = masterInfo.hostname or masterInfo.ip
@@ -195,6 +199,10 @@ class Scheduler(mesos.interface.Scheduler):
         elif failed:
             self.running -= 1
             self.failed += 1
+
+        # Schedule cleanup for this task now that it's terminal
+        if finished or failed:
+            self.cleanup.schedule_cleanup(task_id)
 
         # If there are no tasks running, and the queue is empty, we should stop
         if self.running == 0 and self.pending == 0:
@@ -422,3 +430,48 @@ class Scheduler(mesos.interface.Scheduler):
         output.seek(0)
 
         return tar_size
+
+
+class TaskCleanupThread(threading.Thread):
+
+    def __init__(self, fs, *args, **kwargs):
+        self.filesystem = fs
+
+        self._queue = Queue()
+        self._queue_event = threading.Event()
+
+        super(TaskCleanupThread, self).__init__(*args, **kwargs)
+
+        self.setDeemon(True)
+
+    def schedule_cleanup(self, task_id, attempt=0):
+
+        if not self.filesystem:
+            logging.info("Skipping cleanup due to no filesystem")
+            return
+
+        logger.debug("Scheduling cleanup for task %s", task_id)
+
+        self._queue.put((task_id, attempt))
+        self._queue_event.set()
+
+    def run(self):
+
+        while True:
+            self._queue_event.wait()
+            task_id, attempts = self._queue.get()
+
+            if attempts > 2:
+                logger.error("Failed to cleanup staging directory after %d attempts", attempts + 1)
+                self._queue.task_done()
+
+            staging_dir = os.path.join("staging", task_id)
+            logger.info("Cleaning up staging directory %s", staging_dir)
+
+            try:
+                if self.filesystem.isdir(staging_dir):
+                    self.filesystem.removedir(staging_dir, force=True)
+                self._queue.task_done()
+            except Exception, e:
+                logger.error("Caught exception cleaning staging directory %s (%s)", staging_dir, e)
+                self.schedule_event(task_id, attempts + 1)

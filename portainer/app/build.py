@@ -37,7 +37,7 @@ def args(parser):
                        help="Multiple tags to apply to the image once built")
     group.add_argument("--container-image", default="jpetazzo/dind",
                        help="Docker image to run the portainer executor in")
-    group.add_argument("--insecure", default=False,
+    group.add_argument("--insecure", default=False, action="store_true",
                        help="Enable pulling/pushing of images with insecure registries")
 
     # Arguments for the staging filesystem

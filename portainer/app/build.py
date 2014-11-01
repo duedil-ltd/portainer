@@ -69,6 +69,7 @@ def main(args):
         pull_registry=args.pull_registry,
         push_registry=args.push_registry,
         staging_uri=args.staging_uri,
+        container_image=args.container_image,
         stream=args.stream,
         docker_host=args.docker_host,
         verbose=args.verbose

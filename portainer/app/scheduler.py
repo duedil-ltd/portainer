@@ -37,8 +37,8 @@ class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
     def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
-                 staging_uri, stream=False, verbose=False, repository=None,
-                 pull_registry=None, docker_host=None):
+                 staging_uri, container_image, stream=False, verbose=False,
+                 repository=None, pull_registry=None, docker_host=None):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -46,6 +46,7 @@ class Scheduler(mesos.interface.Scheduler):
         self.push_registry = push_registry
         self.pull_registry = pull_registry
         self.staging_uri = staging_uri
+        self.container_image = container_image
         self.stream = stream
         self.verbose = verbose
         self.repository = repository
@@ -344,11 +345,8 @@ class Scheduler(mesos.interface.Scheduler):
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
 
-        # TODO(tarnfeld): Make this configurable
-        # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf
-        task.executor.command.container.image = "docker://jpetazzo/dind"
-
-        # We have to mount the /var/lib/docker VOLUME inside of the sandbox
+        # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
+        task.executor.command.container.image = "docker://%s" % (self.container_image)
         task.executor.command.container.options.extend(["--privileged"])
         task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
 
@@ -368,7 +366,7 @@ class Scheduler(mesos.interface.Scheduler):
         task.data = build_task.SerializeToString()
         task.executor.data = task.data
 
-        # Build up the resources
+        # Build up the resources we require
         cpu_resource = task.resources.add()
         cpu_resource.name = "cpus"
         cpu_resource.type = mesos_pb2.Value.SCALAR

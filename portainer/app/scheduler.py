@@ -38,7 +38,7 @@ class Scheduler(mesos.interface.Scheduler):
 
     def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
-                 pull_registry=None, docker_host=None):
+                 pull_registry=None, docker_host=None, container_image=None):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -50,6 +50,7 @@ class Scheduler(mesos.interface.Scheduler):
         self.verbose = verbose
         self.repository = repository
         self.docker_host = docker_host
+        self.container_image = container_image
 
         self.queued_tasks = []
         for path, tags in tasks:
@@ -344,16 +345,14 @@ class Scheduler(mesos.interface.Scheduler):
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
 
-        # TODO(tarnfeld): Make this configurable
-        # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf
-        task.executor.command.container.image = "docker://jpetazzo/dind"
-
-        # We have to mount the /var/lib/docker VOLUME inside of the sandbox
-        task.executor.command.container.options.extend(["--privileged"])
-        task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
+        if self.container_image:
+            # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
+            task.executor.command.container.image = "docker://%s" % (self.container_image)
+            task.executor.command.container.options.extend(["--privileged"])
+            task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
 
         task.executor.name = "build"
-        task.executor.source = "portainer"
+        task.executor.source = "build %s" % (task.name)
 
         # Configure the mesos executor with the portainer executor uri
         portainer_executor = task.executor.command.uris.add()
@@ -368,7 +367,7 @@ class Scheduler(mesos.interface.Scheduler):
         task.data = build_task.SerializeToString()
         task.executor.data = task.data
 
-        # Build up the resources
+        # Build up the resources we require
         cpu_resource = task.resources.add()
         cpu_resource.name = "cpus"
         cpu_resource.type = mesos_pb2.Value.SCALAR

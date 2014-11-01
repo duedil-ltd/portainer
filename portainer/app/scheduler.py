@@ -351,7 +351,7 @@ class Scheduler(mesos.interface.Scheduler):
         task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
 
         task.executor.name = "build"
-        task.executor.source = "portainer"
+        task.executor.source = "build %s" % (task.name)
 
         # Configure the mesos executor with the portainer executor uri
         portainer_executor = task.executor.command.uris.add()

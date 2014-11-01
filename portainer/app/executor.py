@@ -74,9 +74,8 @@ class Executor(mesos.interface.Executor):
                 os.path.join(env["MESOS_DIRECTORY"], "docker")
             )
 
-            if build_task.daemon.HasField("insecure_registries"):
-                for reg in build_task.daemon.insecure_registries:
-                    env["DOCKER_DAEMON_ARGS"] += " --insecure-registry %s" % reg
+            for reg in build_task.daemon.insecure_registries:
+                env["DOCKER_DAEMON_ARGS"] += " --insecure-registry %s" % reg
 
             # Use the `wrapdocker` script included in our docker image
             proc = subprocess.Popen(["/usr/local/bin/wrapdocker"], env=env)

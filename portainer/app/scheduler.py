@@ -316,7 +316,7 @@ class Scheduler(mesos.interface.Scheduler):
         if self.insecure_registries:
             for registry in [self.pull_registry, self.push_registry]:
                 if registry:
-                    build_task.daemon.insecure_registries.add(registry)
+                    build_task.daemon.insecure_registries.append(registry)
 
         # Pull out the repository from the dockerfile
         try:

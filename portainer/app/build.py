@@ -16,8 +16,6 @@ logger = logging.getLogger("portainer.build")
 
 def args(parser):
     parser.add_argument("dockerfile", nargs="+")
-    parser.add_argument("--tag", action="append", default=[], dest="tags",
-                        help="Multiple tags to apply to the image once built")
     parser.add_argument("--executor-uri", dest="executor", required=True,
                         help="URI to the portainer executor for mesos")
 
@@ -35,6 +33,10 @@ def args(parser):
                        help="Docker registry to push built images TO")
     group.add_argument("--stream", default=False, action="store_true",
                        help="Stream the docker build output to the framework")
+    group.add_argument("--tag", action="append", default=[], dest="tags",
+                       help="Multiple tags to apply to the image once built")
+    group.add_argument("--container-image", default="jpetazzo/dind",
+                       help="Docker image to run the portainer executor in")
 
     # Arguments for the staging filesystem
     group = parser.add_argument_group("fs")
@@ -58,6 +60,9 @@ def main(args):
     if args.framework_id:
         framework.id.value = args.framework_id
 
+    if args.docker_host:
+        args.container_image = None
+
     scheduler = Scheduler(
         tasks=[(d, args.tags) for d in args.dockerfile],
         executor_uri=args.executor,
@@ -67,6 +72,7 @@ def main(args):
         pull_registry=args.pull_registry,
         push_registry=args.push_registry,
         staging_uri=args.staging_uri,
+        container_image=args.container_image,
         stream=args.stream,
         docker_host=args.docker_host,
         verbose=args.verbose

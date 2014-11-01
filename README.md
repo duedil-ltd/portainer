@@ -40,8 +40,6 @@ When building docker images at scale, it can be time consuming and wasteful to m
 
 Given an existing Apache Mesos cluster, Portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](http://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](http://mesos.apache.org/gettingstarted/).
 
-**Note: If you are _not_ using the External Containerizer + Docker integration (with [our containerizer](http://github.com/duedil-ltd/mesos-docker-containerizer)/[deimos](https://github.com/mesosphere/deimos)) this framework will not work for you as it stands. This also goes for the docker containerizer released in 0.20.0 as it does not support the `--privileged` option.**
-
 --------------------------------------------------------------------------------
 
 ## Features
@@ -69,6 +67,12 @@ You'll need to have the following dependencies installed to run the framework, t
 - **Python `virtualenv` and `pip`**
 - **Protocol Buffers (`brew install protobuf`)**
 - Make
+
+### Slave Dependencies
+
+By default, Portainer will try and launch an ephemeral docker daemon (`docker -d`) on the mesos slave machine using [docker in docker](github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos slaves. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the docker daemon can be accessed on each slave.
+
+*Note: If you are using Apache Mesos with the built in Docker Containerizer released with version 0.20.0, Portainer won't yet work. This is pending the release of [this commit](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto#L886).*
 
 ## Building Images
 

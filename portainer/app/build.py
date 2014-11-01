@@ -37,6 +37,8 @@ def args(parser):
                        help="Multiple tags to apply to the image once built")
     group.add_argument("--container-image", default="jpetazzo/dind",
                        help="Docker image to run the portainer executor in")
+    group.add_argument("--insecure", default=False,
+                       help="Enable pulling/pushing of images with insecure registries")
 
     # Arguments for the staging filesystem
     group = parser.add_argument_group("fs")
@@ -75,7 +77,8 @@ def main(args):
         container_image=args.container_image,
         stream=args.stream,
         docker_host=args.docker_host,
-        verbose=args.verbose
+        verbose=args.verbose,
+        insecure_registries=args.insecure
     )
 
     driver = pesos.scheduler.PesosSchedulerDriver(

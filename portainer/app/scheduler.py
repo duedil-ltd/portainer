@@ -38,7 +38,8 @@ class Scheduler(mesos.interface.Scheduler):
 
     def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
-                 pull_registry=None, docker_host=None, container_image=None):
+                 pull_registry=None, docker_host=None, container_image=None,
+                 insecure_registries=False):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -51,6 +52,7 @@ class Scheduler(mesos.interface.Scheduler):
         self.repository = repository
         self.docker_host = docker_host
         self.container_image = container_image
+        self.insecure_registries = insecure_registries
 
         self.queued_tasks = []
         for path, tags in tasks:
@@ -308,8 +310,13 @@ class Scheduler(mesos.interface.Scheduler):
         else:
             build_task.dockerfile = dockerfile.build()
 
+        # Configure properties on the docker daemon
         if self.docker_host:
-            build_task.docker_host = self.docker_host
+            build_task.daemon.docker_host = self.docker_host
+        if self.insecure_registries:
+            for registry in [self.pull_registry, self.push_registry]:
+                if registry:
+                    build_task.daemon.insecure_registries.add(registry)
 
         # Pull out the repository from the dockerfile
         try:

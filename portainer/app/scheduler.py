@@ -349,7 +349,6 @@ class Scheduler(mesos.interface.Scheduler):
             # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
             task.executor.command.container.image = "docker://%s" % (self.container_image)
             task.executor.command.container.options.extend(["--privileged"])
-            task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
 
         task.executor.name = "build"
         task.executor.source = "build %s" % (task.name)

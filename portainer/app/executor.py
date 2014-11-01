@@ -69,7 +69,12 @@ class Executor(mesos.interface.Executor):
         def launch_docker_daemon():
             logger.info("Launching docker daemon subprocess")
 
-            # TODO(tarnfeld): This should be made a little more flexible
+            env = dict(os.environ)
+            env["DOCKER_DAEMON_ARGS"] = "-g %s" % (
+                os.path.join(env["MESOS_DIRECTORY"], "docker")
+            )
+
+            # Use the `wrapdocker` script included in our docker image
             proc = subprocess.Popen(["/usr/local/bin/wrapdocker"])
 
             self.docker = docker.Client()

@@ -350,7 +350,6 @@ class Scheduler(mesos.interface.Scheduler):
 
         # We have to mount the /var/lib/docker VOLUME inside of the sandbox
         task.executor.command.container.options.extend(["--privileged"])
-        task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
 
         task.executor.name = "build"
         task.executor.source = "portainer"

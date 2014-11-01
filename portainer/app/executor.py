@@ -75,7 +75,7 @@ class Executor(mesos.interface.Executor):
             )
 
             # Use the `wrapdocker` script included in our docker image
-            proc = subprocess.Popen(["/usr/local/bin/wrapdocker"])
+            proc = subprocess.Popen(["/usr/local/bin/wrapdocker"], env=env)
 
             self.docker = docker.Client()
             while True:

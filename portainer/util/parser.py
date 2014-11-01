@@ -114,23 +114,3 @@ class Dockerfile(object):
 
     def build(self):
         return "\n".join([" ".join([i[0]] + i[1]) for i in self.instructions])
-
-
-
-
-# def parse(from_str):
-#     reg = user = repo = tag = None
-
-#     p = from_str.split("/")
-#     if len(p) == 1:
-#         repo = p[0]
-#     elif len(p) == 2:
-#         reg_or_user, repo = p
-#         if set(".-") in set(reg_or_user):
-#             reg = reg_or_user
-#         else:
-#             user = reg_or_user
-#     elif len(p) == 3:
-#         reg, user, repo = p
-
-#     return dict(reg=reg, user=user, repo=repo, tag=tag)

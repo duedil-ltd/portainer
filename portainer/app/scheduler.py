@@ -37,8 +37,8 @@ class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
     def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
-                 staging_uri, container_image, stream=False, verbose=False,
-                 repository=None, pull_registry=None, docker_host=None):
+                 staging_uri, stream=False, verbose=False, repository=None,
+                 pull_registry=None, docker_host=None, container_image=None):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -46,11 +46,11 @@ class Scheduler(mesos.interface.Scheduler):
         self.push_registry = push_registry
         self.pull_registry = pull_registry
         self.staging_uri = staging_uri
-        self.container_image = container_image
         self.stream = stream
         self.verbose = verbose
         self.repository = repository
         self.docker_host = docker_host
+        self.container_image = container_image
 
         self.queued_tasks = []
         for path, tags in tasks:
@@ -345,10 +345,11 @@ class Scheduler(mesos.interface.Scheduler):
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
 
-        # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
-        task.executor.command.container.image = "docker://%s" % (self.container_image)
-        task.executor.command.container.options.extend(["--privileged"])
-        task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
+        if self.container_image:
+            # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
+            task.executor.command.container.image = "docker://%s" % (self.container_image)
+            task.executor.command.container.options.extend(["--privileged"])
+            task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
 
         task.executor.name = "build"
         task.executor.source = "build %s" % (task.name)

@@ -60,6 +60,9 @@ def main(args):
     if args.framework_id:
         framework.id.value = args.framework_id
 
+    if args.docker_host:
+        args.container_image = None
+
     scheduler = Scheduler(
         tasks=[(d, args.tags) for d in args.dockerfile],
         executor_uri=args.executor,

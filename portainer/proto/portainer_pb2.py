@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='proto/portainer.proto',
   package='portainer',
-  serialized_pb='\n\x15proto/portainer.proto\x12\tportainer\"\x90\x01\n\tBuildTask\x12%\n\x05image\x18\x01 \x02(\x0b\x32\x16.portainer.DockerImage\x12\'\n\x06\x64\x61\x65mon\x18\x07 \x02(\x0b\x32\x17.portainer.DockerDaemon\x12\x0f\n\x07\x63ontext\x18\x02 \x01(\t\x12\x12\n\ndockerfile\x18\x06 \x01(\t\x12\x0e\n\x06stream\x18\x05 \x01(\x08\"[\n\x0b\x44ockerImage\x12+\n\x08registry\x18\x02 \x01(\x0b\x32\x19.portainer.DockerRegistry\x12\x12\n\nrepository\x18\x01 \x02(\t\x12\x0b\n\x03tag\x18\x03 \x03(\t\"4\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x10\n\x04port\x18\x02 \x01(\r:\x02\x38\x30\"U\n\x0c\x44ockerDaemon\x12\x13\n\x0b\x64ocker_host\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocker_args\x18\x02 \x01(\t\x12\x1b\n\x13insecure_registries\x18\x03 \x03(\t')
+  serialized_pb='\n\x15proto/portainer.proto\x12\tportainer\"\x90\x01\n\tBuildTask\x12%\n\x05image\x18\x01 \x02(\x0b\x32\x16.portainer.DockerImage\x12\'\n\x06\x64\x61\x65mon\x18\x07 \x01(\x0b\x32\x17.portainer.DockerDaemon\x12\x0f\n\x07\x63ontext\x18\x02 \x01(\t\x12\x12\n\ndockerfile\x18\x06 \x01(\t\x12\x0e\n\x06stream\x18\x05 \x01(\x08\"[\n\x0b\x44ockerImage\x12+\n\x08registry\x18\x02 \x01(\x0b\x32\x19.portainer.DockerRegistry\x12\x12\n\nrepository\x18\x01 \x02(\t\x12\x0b\n\x03tag\x18\x03 \x03(\t\"4\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x10\n\x04port\x18\x02 \x01(\r:\x02\x38\x30\"U\n\x0c\x44ockerDaemon\x12\x13\n\x0b\x64ocker_host\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocker_args\x18\x02 \x01(\t\x12\x1b\n\x13insecure_registries\x18\x03 \x03(\t')
 
 
 
@@ -34,7 +34,7 @@ _BUILDTASK = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='daemon', full_name='portainer.BuildTask.daemon', index=1,
-      number=7, type=11, cpp_type=10, label=2,
+      number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,

@@ -399,7 +399,7 @@ class Scheduler(mesos.interface.Scheduler):
 
         tar = tarfile.open(mode="w:gz", fileobj=output)
         for idx, (cmd, instruction) in enumerate(dockerfile.instructions):
-            if cmd == "ADD":
+            if cmd in ("ADD", "COPY"):
                 local_path, remote_path = instruction
                 tar_path = "context/%s" % str(idx)
 

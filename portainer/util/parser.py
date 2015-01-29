@@ -2,6 +2,8 @@
 Simple parser for Dockerfile's.
 """
 
+from itertools import chain
+
 
 def parse_dockerfile(path, **kwargs):
     """Parse a dockerfile and return a new Dockerfile object"""
@@ -106,9 +108,14 @@ class Dockerfile(object):
     @property
     def has_local_sources(self):
         return len(
-            filter(
-                lambda (src, dst): not src.startswith("http"),
-                self.get("ADD")
+            list(
+                chain(
+                    filter(
+                        lambda (src, dst): not src.startswith("http"),
+                        self.get("ADD", [])
+                    ),
+                    self.get("COPY", [])
+                )
             )
         ) > 0
 

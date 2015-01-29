@@ -2,6 +2,8 @@
 Simple parser for Dockerfile's.
 """
 
+from itertools import chain
+
 
 def parse_dockerfile(path, **kwargs):
     """Parse a dockerfile and return a new Dockerfile object"""

@@ -353,9 +353,9 @@ class Scheduler(mesos.interface.Scheduler):
         )
 
         if self.container_image:
-            # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
-            task.executor.command.container.image = "docker://%s" % (self.container_image)
-            task.executor.command.container.options.extend(["--privileged"])
+            task.executor.container.type = mesos_pb2.ContainerInfo.DOCKER
+            task.executor.container.docker.image = self.container_image
+            task.executor.container.docker.privileged = True
 
         task.executor.name = "build"
         task.executor.source = "build %s" % (task.name)

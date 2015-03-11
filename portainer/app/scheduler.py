@@ -348,7 +348,7 @@ class Scheduler(mesos.interface.Scheduler):
             args.append("--verbose")
 
         task.executor.executor_id.value = task_id
-        task.executor.command.value = "./%s/bin/portainer %s build-executor" % (
+        task.executor.command.value = "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor" % (
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
 

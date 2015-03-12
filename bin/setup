@@ -34,10 +34,17 @@ export PYTHONPATH=
 export CFLAGS=-Qunused-arguments
 export CPPFLAGS=-Qunused-arguments
 
+if [ ! -e ./env/bin/activate ]; then
+  virtualenv ./env -p python2.7
+  source ./env/bin/activate
+  ./env/bin/python ./env/bin/pip install -U distribute==0.6.46
+else
+  source ./env/bin/activate
+fi
+
+
 # Install the requirements
 if [ ! -f "./env/updated" -o ../requirements.pip -nt ./env/updated ]; then
-  virtualenv ./env -p python2.7
-  ./env/bin/pip install -U distribute==0.6.46
   ./env/bin/pip install -r ../requirements.pip
   if [ $? -ne 0 ]; then
     echo "There was a problem installing requirements. Aborting."

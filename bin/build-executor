@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
-#
 # Script for building the portainer executor tar file. This script will generate
 # a file in ../dist/portainer-{git hash}.tar.gz to be uploaded to somewhere accessible
 # from your mesos cluster.
-# 
+#
 # If you have uncommitted changes, the script will do nothing with the FORCE
 # environment variable set.
-#
+
+# How it works: ensure we're in the virtualenv so we have pex & decent pip &
+# setuptools, then (re)download all dependencies as wheels, then pass to pex.
+# Why? A) pex doesn't take git URLs in requirements, wheel does. B) I haven't
+# figured out how/if to get pex to install them straight from the virtualenv.
 
 set -e
 
@@ -29,24 +32,27 @@ TMP_DIR=$(mktemp -d -t XXXXXX)
 
 echo "Using temporary directory $TMP_DIR"
 
-# Create a copy of the repository
+bin/setup
+# Enter the virtualenv
+. ./bin/env/bin/activate
+pip install wheel -q
+pushd $TMP_DIR > /dev/null
+    echo "Fetching dependencies (fresh) to tmp wheelhouse..."
+    pip wheel -q -r $SOURCE_DIR/requirements.pip
+
+    # Gather up all requirements (other than pex itself) as cli "-r" args to pex
+    reqs=$(ls wheelhouse | sed -n 's/^\([^-]*\)-.*$/\1/p' | grep -v pex | awk '$0="-r "$0')
+
+    echo "Building pex"
+    pex --wheel --repo wheelhouse --cache-dir ./cache $reqs -s $SOURCE_DIR  -e portainer.app -o ./bin/portainer
+
+    rm -rf wheelhouse
+    rm -rf cache
+popd > /dev/null
+
 mkdir -p dist
-pushd dist
-    pushd $TMP_DIR
-        mkdir build
-        cp -r $SOURCE_DIR/** build/
-
-        pushd build
-            make clean
-            make protobuf
-        popd
-
-        mv build $TAR_NAME
-        tar -cvf $TAR_NAME.tar.gz $TAR_NAME
-    popd
-
-    mv $TMP_DIR/$TAR_NAME.tar.gz ./
-
-    echo "Cleaning up temporary directory"
-    rm -rf $TMP_DIR
-popd
+pushd dist > /dev/null
+    mv $TMP_DIR ./$TAR_NAME
+    tar -cvf $TAR_NAME.tar.gz $TAR_NAME
+    rm -rf ./$TAR_NAME
+popd > /dev/null

@@ -23,6 +23,7 @@ third_party/*.egg
 *.pex
 bin/virtualenv-*
 *.venv
+MANIFEST
 
 # Installer logs
 pip-log.txt

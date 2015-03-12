@@ -37,7 +37,7 @@ export CPPFLAGS=-Qunused-arguments
 if [ ! -e ./env/bin/activate ]; then
   virtualenv ./env -p python2.7
   source ./env/bin/activate
-  ./env/bin/python ./env/bin/pip install -U distribute==0.6.46
+  ./env/bin/python ./env/bin/pip install -U setuptools==12.2
 else
   source ./env/bin/activate
 fi

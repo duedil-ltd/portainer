@@ -16,16 +16,18 @@ set -e
 
 cd $(dirname $(dirname $0))
 
+GIT_REV=$(git rev-parse HEAD)
 # Help the user out by warning them of uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
     if [ ! "$FORCE" ]; then
         echo "You appear to have uncommitted changes, use FORCE=1 to proceed."
         exit 1
+    else
+        GIT_REV="$GIT_REV-DIRTY"
     fi
 fi
 
 # Figure out the git revision
-GIT_REV=$(git rev-parse HEAD)
 SOURCE_DIR=$(pwd)
 TAR_NAME="portainer-$GIT_REV"
 TMP_DIR=$(mktemp -d -t XXXXXX)

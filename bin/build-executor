@@ -50,6 +50,13 @@ pushd $TMP_DIR > /dev/null
     echo "Building pex"
     pex --wheel --repo wheelhouse --cache-dir ./cache $reqs -s $SOURCE_DIR  -e portainer.app -o ./bin/portainer
 
+    # if there's anything that looks like a non-pure-python wheel being used, mark the filename as platform-specific
+    # check for wheels with names that aren't "..-py2..", "..-py2.py3.." etc -- ones with c deps for example are named "..-cp27.."
+    if $(ls | grep -qv '^.*-.*-py\d'); then
+        PLATFORM=$(python -c 'import pkg_resources; print pkg_resources.get_build_platform()')
+        TAR_NAME="${TAR_NAME}.${PLATFORM}"
+    fi
+
     deactivate
     rm -rf wheelhouse
     rm -rf cache

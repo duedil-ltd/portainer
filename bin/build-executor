@@ -32,22 +32,26 @@ TMP_DIR=$(mktemp -d -t XXXXXX)
 
 echo "Using temporary directory $TMP_DIR"
 
-bin/setup
-# Enter the virtualenv
-. ./bin/env/bin/activate
-pip install wheel -q
 pushd $TMP_DIR > /dev/null
+
+    # pex has ridiculously finickity dependencies; use a dedicated virtualenv
+    $SOURCE_DIR/bin/setup $TMP_DIR/pexenv $SOURCE_DIR/requirements.pexbuild.txt
+    source $TMP_DIR/pexenv/bin/activate
+
     echo "Fetching dependencies (fresh) to tmp wheelhouse..."
     pip wheel -q -r $SOURCE_DIR/requirements.pip
 
     # Gather up all requirements (other than pex itself) as cli "-r" args to pex
     reqs=$(ls wheelhouse | sed -n 's/^\([^-]*\)-.*$/\1/p' | grep -v pex | awk '$0="-r "$0')
 
+    mkdir cache
     echo "Building pex"
     pex --wheel --repo wheelhouse --cache-dir ./cache $reqs -s $SOURCE_DIR  -e portainer.app -o ./bin/portainer
 
+    deactivate
     rm -rf wheelhouse
     rm -rf cache
+    rm -rf pexenv
 popd > /dev/null
 
 mkdir -p dist

@@ -66,6 +66,6 @@ popd > /dev/null
 mkdir -p dist
 pushd dist > /dev/null
     mv $TMP_DIR ./$TAR_NAME
-    tar -cvf $TAR_NAME.tar.gz $TAR_NAME
+    tar -czvf $TAR_NAME.tar.gz $TAR_NAME
     rm -rf ./$TAR_NAME
 popd > /dev/null

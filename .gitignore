@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# OSX fluff
+.DS_Store
+
 # C extensions
 *.so
 

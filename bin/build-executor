@@ -40,15 +40,19 @@ pushd $TMP_DIR > /dev/null
     $SOURCE_DIR/bin/setup $TMP_DIR/pexenv $SOURCE_DIR/requirements.pexbuild.txt
     source $TMP_DIR/pexenv/bin/activate
 
-    echo "Fetching dependencies (fresh) to tmp wheelhouse..."
-    pip wheel -q -r $SOURCE_DIR/requirements.pip
+    echo "Fetching dependencies (fresh) to wheelhouse"
+    # Use wheel to download, so that we get git-urls and non-pypi releases, all consistently bundled as wheels for pex
+    # to then load. Mo need to fetch dependencies, as pex will do it anyway (and do it better it seems)
+    pip wheel -q --no-deps -r $SOURCE_DIR/requirements.pip
 
-    # Gather up all requirements (other than pex itself) as cli "-r" args to pex
+    # Gather up all requirements as cli "-r" args to pex. Because we have git urls, we have to provide them all
+    # 'inexact' as bare names, as we don't know the versions in advance
     reqs=$(ls wheelhouse | sed -n 's/^\([^-]*\)-.*$/\1/p' | grep -v pex | awk '$0="-r "$0')
 
-    mkdir cache
     echo "Building pex"
-    pex --wheel --repo wheelhouse --cache-dir ./cache $reqs -s $SOURCE_DIR  -e portainer.app -o ./bin/portainer
+    # Then feed them all to pex, using the wheelhouse as the cache dir. Provide a cache TTL to trick pex into using the
+    # .whl files even though the req list entries are inexact
+    pex --wheel --repo wheelhouse --cache-dir wheelhouse --cache-ttl=9999 $reqs -s $SOURCE_DIR  -e portainer.app -o ./bin/portainer
 
     # if there's anything that looks like a non-pure-python wheel being used, mark the filename as platform-specific
     # check for wheels with names that aren't "..-py2..", "..-py2.py3.." etc -- ones with c deps for example are named "..-cp27.."
@@ -59,7 +63,6 @@ pushd $TMP_DIR > /dev/null
 
     deactivate
     rm -rf wheelhouse
-    rm -rf cache
     rm -rf pexenv
 popd > /dev/null
 

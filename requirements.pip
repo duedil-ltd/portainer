@@ -1,11 +1,9 @@
-git+git://github.com/duedil-ltd/tornado.git@1ceefdd89be8c3df217d79e0faa2d1948a231646#egg=tornado
-git+git://github.com/wickman/compactor.git@0a16c6f8af55171d46cc03d4abfa4e3d5ef8ea38#egg=compactor
-git+git://github.com/orls/pesos.git@7a46fb035cd902fb3b142cedf57de6aa4976a1f1#egg=pesos
+git+git://github.com/tarnfeld/pesos.git@d489a976cd9aaf9012e03888d7bfb44b903977c6#egg=pesos
 git+git://github.com/duedil-ltd/pyfilesystem.git@f952ec334e074d56f187dd61a3932d7b884dbdde#egg=fs
 trollius==0.4
-protobuf==2.5.0
+protobuf>=2.6.1,<2.7
 docker-py==0.4.0
 boto==2.27.0
 progressbar==2.2
 pywebhdfs==0.2.4
-mesos.interface==0.21.0
+mesos.interface==0.21.1

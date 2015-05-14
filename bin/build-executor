@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 # Script for building the portainer executor tar file. This script will generate
-# a file in ../dist/portainer-{git hash}.tar.gz to be uploaded to somewhere accessible
-# from your mesos cluster.
+# a file in ../dist/portainer-{git hash}.{platform label}.tar.gz to be uploaded
+# to somewhere accessible to your mesos cluster.
 #
-# If you have uncommitted changes, the script will do nothing with the FORCE
-# environment variable set.
+# If you have uncommitted changes, the script will do nothing unless the FORCE
+# environment variable is set (which also adds '-DIRTY' to the git hash.
 
-# How it works: ensure we're in the virtualenv so we have pex & decent pip &
+# How it works: enter a specialized virtualenv so we have pex & decent pip &
 # setuptools, then (re)download all dependencies as wheels, then pass to pex.
 # Why? A) pex doesn't take git URLs in requirements, wheel does. B) I haven't
-# figured out how/if to get pex to install them straight from the virtualenv.
+# figured out how/if to get pex to install deps straight from the virtualenv.
 
 set -e
 

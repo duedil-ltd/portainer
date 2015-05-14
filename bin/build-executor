@@ -1,52 +1,74 @@
 #!/usr/bin/env bash
 
-#
 # Script for building the portainer executor tar file. This script will generate
 # a file in ../dist/portainer-{git hash}.tar.gz to be uploaded to somewhere accessible
 # from your mesos cluster.
-# 
+#
 # If you have uncommitted changes, the script will do nothing with the FORCE
 # environment variable set.
-#
+
+# How it works: ensure we're in the virtualenv so we have pex & decent pip &
+# setuptools, then (re)download all dependencies as wheels, then pass to pex.
+# Why? A) pex doesn't take git URLs in requirements, wheel does. B) I haven't
+# figured out how/if to get pex to install them straight from the virtualenv.
 
 set -e
 
 cd $(dirname $(dirname $0))
 
+GIT_REV=$(git rev-parse HEAD)
 # Help the user out by warning them of uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
     if [ ! "$FORCE" ]; then
         echo "You appear to have uncommitted changes, use FORCE=1 to proceed."
         exit 1
+    else
+        GIT_REV="$GIT_REV-DIRTY"
     fi
 fi
 
 # Figure out the git revision
-GIT_REV=$(git rev-parse HEAD)
 SOURCE_DIR=$(pwd)
 TAR_NAME="portainer-$GIT_REV"
 TMP_DIR=$(mktemp -d -t XXXXXX)
 
 echo "Using temporary directory $TMP_DIR"
 
-# Create a copy of the repository
+pushd $TMP_DIR > /dev/null
+
+    # pex has ridiculously finickity dependencies; use a dedicated virtualenv
+    $SOURCE_DIR/bin/setup $TMP_DIR/pexenv $SOURCE_DIR/requirements.pexbuild.txt
+    source $TMP_DIR/pexenv/bin/activate
+
+    echo "Fetching dependencies (fresh) to wheelhouse"
+    # Use wheel to download, so that we get git-urls and non-pypi releases, all consistently bundled as wheels for pex
+    # to then load. Mo need to fetch dependencies, as pex will do it anyway (and do it better it seems)
+    pip wheel -q --no-deps -r $SOURCE_DIR/requirements.pip
+
+    # Gather up all requirements as cli "-r" args to pex. Because we have git urls, we have to provide them all
+    # 'inexact' as bare names, as we don't know the versions in advance
+    reqs=$(ls wheelhouse | sed -n 's/^\([^-]*\)-.*$/\1/p' | grep -v pex | awk '$0="-r "$0')
+
+    echo "Building pex"
+    # Then feed them all to pex, using the wheelhouse as the cache dir. Provide a cache TTL to trick pex into using the
+    # .whl files even though the req list entries are inexact
+    pex --wheel --repo wheelhouse --cache-dir wheelhouse --cache-ttl=9999 $reqs -s $SOURCE_DIR  -e portainer.app -o ./bin/portainer
+
+    # if there's anything that looks like a non-pure-python wheel being used, mark the filename as platform-specific
+    # check for wheels with names that aren't "..-py2..", "..-py2.py3.." etc -- ones with c deps for example are named "..-cp27.."
+    if $(ls | grep -qv '^.*-.*-py\d'); then
+        PLATFORM=$(python -c 'import pkg_resources; print pkg_resources.get_build_platform()')
+        TAR_NAME="${TAR_NAME}.${PLATFORM}"
+    fi
+
+    deactivate
+    rm -rf wheelhouse
+    rm -rf pexenv
+popd > /dev/null
+
 mkdir -p dist
-pushd dist
-    pushd $TMP_DIR
-        mkdir build
-        cp -r $SOURCE_DIR/** build/
-
-        pushd build
-            make clean
-            make protobuf
-        popd
-
-        mv build $TAR_NAME
-        tar -cvf $TAR_NAME.tar.gz $TAR_NAME
-    popd
-
-    mv $TMP_DIR/$TAR_NAME.tar.gz ./
-
-    echo "Cleaning up temporary directory"
-    rm -rf $TMP_DIR
-popd
+pushd dist > /dev/null
+    mv $TMP_DIR ./$TAR_NAME
+    tar -czvf $TAR_NAME.tar.gz $TAR_NAME
+    rm -rf ./$TAR_NAME
+popd > /dev/null

@@ -9,6 +9,9 @@
 
 cd $(dirname "$0")
 
+VENV_DIR=${1:-"./env"}
+REQUIREMENTS_FILE=${2:-"./../requirements.pip"}
+
 if [ ! "$(which virtualenv)" ]; then
   easy_install 'virtualenv==1.10.1'
 fi
@@ -34,16 +37,23 @@ export PYTHONPATH=
 export CFLAGS=-Qunused-arguments
 export CPPFLAGS=-Qunused-arguments
 
+if [ ! -e $VENV_DIR/bin/activate ]; then
+  virtualenv $VENV_DIR -p python2.7
+  source $VENV_DIR/bin/activate
+  $VENV_DIR/bin/python $VENV_DIR/bin/pip install -U setuptools
+else
+  source $VENV_DIR/bin/activate
+fi
+
+
 # Install the requirements
-if [ ! -f "./env/updated" -o ../requirements.pip -nt ./env/updated ]; then
-  virtualenv ./env -p python2.7
-  ./env/bin/pip install -U distribute==0.6.46
-  ./env/bin/pip install -r ../requirements.pip
+if [ ! -f "$VENV_DIR/updated" -o $REQUIREMENTS_FILE -nt $VENV_DIR/updated ]; then
+  $VENV_DIR/bin/pip install -r $REQUIREMENTS_FILE
   if [ $? -ne 0 ]; then
     echo "There was a problem installing requirements. Aborting."
     exit 1
   fi
 
   echo Base requirements installed.
-  touch ./env/updated
+  touch $VENV_DIR/updated
 fi

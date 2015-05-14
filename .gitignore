@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# OSX fluff
+.DS_Store
+
 # C extensions
 *.so
 
@@ -23,6 +26,7 @@ third_party/*.egg
 *.pex
 bin/virtualenv-*
 *.venv
+MANIFEST
 
 # Installer logs
 pip-log.txt

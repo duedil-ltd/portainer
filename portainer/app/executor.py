@@ -1,5 +1,7 @@
-"""
-"""
+"""The app that runs as the executor, invoked by mesos (thanks to the task info
+sent from the portainer scheduler) as "pid one" of the task. Responsible for
+invoking the docker daemon, then running `docker build` for the task's staged
+context file, and communicating with mesos throughout"""
 
 import docker
 import functools

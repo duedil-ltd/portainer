@@ -190,7 +190,7 @@ class Scheduler(mesos.interface.Scheduler):
                         driver.stop()
                 else:
                     logger.info("Launching %d tasks", len(tasks))
-                    driver.launchTasks(offer.id, tasks)
+                    driver.launchTasks([offer.id], tasks)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""

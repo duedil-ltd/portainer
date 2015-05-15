@@ -1,5 +1,6 @@
-"""
-"""
+"""The scheduler. Communicates with mesos to listen for offers; then prepare
+the task definition; pack up the task context; ship it to the staging area;
+accept the offer and launch the task; and wait for the result"""
 
 import logging
 import os

@@ -8,7 +8,7 @@ set -e
 wget -q -O - http://get.docker.io/gpg | sudo apt-key add -
 sudo bash -c "echo 'deb http://get.docker.io/ubuntu docker main' > /etc/apt/sources.list.d/docker.list"
 sudo apt-get update -q
-sudo apt-get install -q -y lxc-docker
+sudo apt-get install -q -y lxc-docker python-setuptools python-virtualenv
 sudo usermod -a -G docker vagrant
 SCRIPT
 

@@ -1,5 +1,5 @@
-"""
-"""
+"""The entrypoint to the portainer app. Spins up the a schedular instance and
+waits for the result."""
 
 import logging
 import pesos.scheduler

@@ -1,0 +1,5 @@
+include *.py
+include portainer/*.py
+include portainer/app/*.py
+include portainer/proto/*.py
+include portainer/util/*.py

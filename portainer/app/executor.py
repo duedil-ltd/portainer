@@ -229,7 +229,7 @@ class Executor(mesos.interface.Executor):
                             str("%s: %s" % (image_name, message))
                         )
             else:
-                sandbox_dir = os.environ["MESOS_DIRECTORY"]
+                sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
                 context_path = os.path.join(sandbox_dir, buildTask.context)
 
                 if not os.path.exists(context_path):

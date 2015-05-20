@@ -191,7 +191,7 @@ class Scheduler(mesos.interface.Scheduler):
                         driver.stop()
                 else:
                     logger.info("Launching %d tasks", len(tasks))
-                    driver.launchTasks(offer.id, tasks)
+                    driver.launchTasks([offer.id], tasks)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""
@@ -349,14 +349,14 @@ class Scheduler(mesos.interface.Scheduler):
             args.append("--verbose")
 
         task.executor.executor_id.value = task_id
-        task.executor.command.value = "./%s/bin/portainer %s build-executor" % (
+        task.executor.command.value = "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor" % (
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
 
         if self.container_image:
-            # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf too
-            task.executor.command.container.image = "docker://%s" % (self.container_image)
-            task.executor.command.container.options.extend(["--privileged"])
+            task.executor.container.type = mesos_pb2.ContainerInfo.DOCKER
+            task.executor.container.docker.image = self.container_image
+            task.executor.container.docker.privileged = True
 
         task.executor.name = "build"
         task.executor.source = "build %s" % (task.name)

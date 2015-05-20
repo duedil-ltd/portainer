@@ -74,7 +74,7 @@ You'll need to have the following dependencies installed to run the framework, t
 
 By default, Portainer will try and launch an ephemeral docker daemon (`docker -d`) on the mesos slave machine using [docker in docker](github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos slaves. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the docker daemon can be accessed on each slave.
 
-*Note: If you are using Apache Mesos with the built in Docker Containerizer released with version 0.20.0, Portainer won't yet work. This is pending the release of [this commit](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto#L886).*
+*Note: Make sure you're on Mesos >=0.21.0 to allow for `privileged` containers.*
 
 ## Building Images
 

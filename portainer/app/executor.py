@@ -100,7 +100,7 @@ class Executor(mesos.interface.Executor):
             daemon_thread.setDaemon(True)
             daemon_thread.start()
         else:
-            self.docker = docker.Client(build_task.docker_host)
+            self.docker = docker.Client(build_task.daemon.docker_host)
             self.docker_daemon_up = True
 
     def disconnected(self, driver):

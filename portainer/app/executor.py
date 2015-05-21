@@ -73,7 +73,7 @@ class Executor(mesos.interface.Executor):
 
             env = dict(os.environ)
             env["DOCKER_DAEMON_ARGS"] = " -g %s" % (
-                os.path.join(env["MESOS_DIRECTORY"], "docker")
+                os.path.join(os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"]), "docker")
             )
 
             for reg in build_task.daemon.insecure_registries:

@@ -238,6 +238,7 @@ class Scheduler(mesos.interface.Scheduler):
             driver.stop()
 
     def framework_message(self, driver, executorId, slaveId, message):
+        message = message.decode('unicode-escape')
         if "Buffering" in message:  # Heh. This'll do for now, eh?
             logger.debug("\t%s", message)
         else:

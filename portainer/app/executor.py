@@ -226,7 +226,7 @@ class Executor(mesos.interface.Executor):
                 for message, is_stream in self._wrap_docker_stream(build_request):
                     if not is_stream or (is_stream and buildTask.stream):
                         driver.sendFrameworkMessage(
-                            str("%s: %s" % (image_name, message))
+                            ("%s: %s" % (image_name, message)).encode('unicode-escape')
                         )
             else:
                 sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
@@ -246,7 +246,7 @@ class Executor(mesos.interface.Executor):
                     for message, is_stream in self._wrap_docker_stream(build_request):
                         if not is_stream or (is_stream and buildTask.stream):
                             driver.sendFrameworkMessage(
-                                str("%s: %s" % (image_name, message))
+                                ("%s: %s" % (image_name, message)).encode('unicode-escape')
                             )
 
             # Extract the newly created image ID

@@ -1,6 +1,7 @@
 """The entrypoint to the portainer app. Spins up the a schedular instance and
 waits for the result."""
 
+import getpass
 import logging
 import pesos.scheduler
 import sys
@@ -56,7 +57,7 @@ def main(args):
 
     # Launch the mesos framework
     framework = mesos_pb2.FrameworkInfo()
-    framework.user = "root"
+    framework.user = getpass.getuser()
     framework.name = "portainer"
 
     if args.framework_id:

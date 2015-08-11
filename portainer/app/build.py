@@ -63,6 +63,9 @@ def main(args):
     if args.framework_id:
         framework.id.value = args.framework_id
 
+    if args.framework_role:
+        framework.role.value = args.framework_role
+
     if args.docker_host:
         args.container_image = None
 

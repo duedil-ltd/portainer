@@ -23,6 +23,8 @@ def main(argv):
                        help="Mesos master address")
     group.add_argument("--framework-id", default=None,
                        help="Custom framework identifier, defaults to a UUID")
+    group.add_argument("--framework-role", default=None,
+                       help="Role name that the framework should attempt to register with")
     group.add_argument("--docker-host", default=None,
                        help="Custom host[:port] for the docker daemon, if not "
                             "specified a short-lived docker daemon will be "

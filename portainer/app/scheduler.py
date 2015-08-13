@@ -125,15 +125,17 @@ class Scheduler(mesos.interface.Scheduler):
                 for offer in offers:
                     offer_cpu = 0.0
                     offer_mem = 0
+                    offer_role = None
 
                     # Extract the important resources from the offer
                     for resource in offer.resources:
+                        offer_role = resource.role
                         if resource.name == "cpus":
                             offer_cpu = float(resource.scalar.value)
                         if resource.name == "mem":
                             offer_mem = int(resource.scalar.value)
 
-                    logger.debug("Received offer for cpus:%f mem:%d", offer_cpu, offer_mem)
+                    logger.debug("Received offer for cpus:%f mem:%d role:%s", offer_cpu, offer_mem, offer_role)
 
                     # Look for a task in the queue that fits the bill
                     for idx, (path, dockerfile, tags) in enumerate(self.queued_tasks):
@@ -145,7 +147,7 @@ class Scheduler(mesos.interface.Scheduler):
                             self.pending -= 1
                             self.running += 1
                             tasks_to_launch.append((offer, path, dockerfile,
-                                                    tags, cpu, mem))
+                                                    tags, cpu, mem, offer_role))
                             # TODO: No support for multiple tasks per offer yet
                             break
                     else:
@@ -156,7 +158,7 @@ class Scheduler(mesos.interface.Scheduler):
                     self.queued_tasks = filter(None, self.queued_tasks)
 
             # Launch the build tasks on the mesos cluster
-            for offer, path, dockerfile, tags, cpu, mem in tasks_to_launch:
+            for offer, path, dockerfile, tags, cpu, mem, role in tasks_to_launch:
                 # Generate a task ID
                 task_id = str(uuid.uuid1())
 
@@ -169,7 +171,8 @@ class Scheduler(mesos.interface.Scheduler):
                         tags=tags,
                         offer=offer,
                         cpu=cpu,
-                        mem=mem
+                        mem=mem,
+                        role=role
                     )]
                 except TaskContextException as e:
                     logger.error("Caught exception: %s", e.message)
@@ -244,7 +247,8 @@ class Scheduler(mesos.interface.Scheduler):
         else:
             logger.info("\t%s", message)
 
-    def _prepare_task(self, driver, task_id, path, dockerfile, tags, offer, cpu, mem):
+    def _prepare_task(self, driver, task_id, path, dockerfile, tags, offer,
+                      cpu, mem, role):
         """Prepare a given dockerfile build task atop the given mesos offer."""
 
         logger.info("Preparing task %s to build %s", task_id, path)
@@ -379,11 +383,13 @@ class Scheduler(mesos.interface.Scheduler):
         cpu_resource = task.resources.add()
         cpu_resource.name = "cpus"
         cpu_resource.type = mesos_pb2.Value.SCALAR
+        cpu_resource.role = role
         cpu_resource.scalar.value = cpu
 
         mem_resource = task.resources.add()
         mem_resource.name = "mem"
         mem_resource.type = mesos_pb2.Value.SCALAR
+        mem_resource.role = role
         mem_resource.scalar.value = mem
 
         self.task_ids[task_id] = build_task

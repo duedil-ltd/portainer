@@ -1,14 +1,17 @@
-"""
-"""
+"""The scheduler. Communicates with mesos to listen for offers; then prepare
+the task definition; pack up the task context; ship it to the staging area;
+accept the offer and launch the task; and wait for the result"""
 
 import logging
 import os
 import mesos.interface
 import progressbar
+import sys
 import StringIO
 import tarfile
 import tempfile
 import threading
+import traceback
 import uuid
 
 from fnmatch import fnmatch
@@ -24,12 +27,21 @@ from portainer.util.parser import parse_dockerfile, parse_dockerignore
 logger = logging.getLogger("portainer.scheduler")
 
 
+class TaskContextException(Exception):
+    pass
+
+
+class StagingSystemRequiredException(Exception):
+    pass
+
+
 class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
     def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
-                 pull_registry=None, docker_host=None):
+                 pull_registry=None, docker_host=None, container_image=None,
+                 insecure_registries=False):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -41,6 +53,8 @@ class Scheduler(mesos.interface.Scheduler):
         self.verbose = verbose
         self.repository = repository
         self.docker_host = docker_host
+        self.container_image = container_image
+        self.insecure_registries = insecure_registries
 
         self.queued_tasks = []
         for path, tags in tasks:
@@ -147,18 +161,41 @@ class Scheduler(mesos.interface.Scheduler):
 
             # Launch the build tasks on the mesos cluster
             for offer, path, dockerfile, tags, cpu, mem in tasks_to_launch:
-                tasks = [self._prepare_task(
-                    driver=driver,
-                    path=path,
-                    dockerfile=dockerfile,
-                    tags=tags,
-                    offer=offer,
-                    cpu=cpu,
-                    mem=mem
-                )]
+                # Generate a task ID
+                task_id = str(uuid.uuid1())
 
-                logger.info("Launching %d tasks", len(tasks))
-                driver.launchTasks(offer.id, tasks)
+                try:
+                    tasks = [self._prepare_task(
+                        driver=driver,
+                        task_id=task_id,
+                        path=path,
+                        dockerfile=dockerfile,
+                        tags=tags,
+                        offer=offer,
+                        cpu=cpu,
+                        mem=mem
+                    )]
+                except TaskContextException as e:
+                    logger.error("Caught exception: %s", e.message)
+                    self.failed += 1
+                    self.running -= 1
+                    tasks = []
+                except StagingSystemRequiredException as e:
+                    logger.error("Caught exception: %s", e.message)
+                    self.failed += 1
+                    self.running -= 1
+                    tasks = []
+
+                if not tasks:
+                    logger.error("Task %s failed to launch", task_id)
+
+                    # If there's no pending tasks or any tasks running, stop
+                    # the driver.
+                    if (self.pending + self.running) == 0:
+                        driver.stop()
+                else:
+                    logger.info("Launching %d tasks", len(tasks))
+                    driver.launchTasks([offer.id], tasks)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""
@@ -209,16 +246,15 @@ class Scheduler(mesos.interface.Scheduler):
             driver.stop()
 
     def framework_message(self, driver, executorId, slaveId, message):
+        message = message.decode('unicode-escape')
         if "Buffering" in message:  # Heh. This'll do for now, eh?
             logger.debug("\t%s", message)
         else:
             logger.info("\t%s", message)
 
-    def _prepare_task(self, driver, path, dockerfile, tags, offer, cpu, mem):
+    def _prepare_task(self, driver, task_id, path, dockerfile, tags, offer, cpu, mem):
         """Prepare a given dockerfile build task atop the given mesos offer."""
 
-        # Generate a task ID
-        task_id = str(uuid.uuid1())
         logger.info("Preparing task %s to build %s", task_id, path)
 
         # Define the build that's required
@@ -252,9 +288,13 @@ class Scheduler(mesos.interface.Scheduler):
             pbar = progressbar.ProgressBar(maxval=context_size, term_width=100)
 
             # Define a custom error handler for the async upload
+            caught_exception = threading.Event()
+
             def handle_exception(e):
-                logger.error("Caught exception uploading the context")
-                raise e
+                (_, _, tb) = sys.exc_info()
+                logger.error("Caught exception uploading the context: %s" % e.message)
+                logger.error(traceback.format_exc(tb))
+                caught_exception.set()
 
             event = self.filesystem.setcontents_async(
                 path=staging_context_path,
@@ -272,12 +312,21 @@ class Scheduler(mesos.interface.Scheduler):
             context.close()
             os.unlink(context_path)
 
+            # Check to see if we caught any exceptions while uploading the context
+            if caught_exception.is_set():
+                raise TaskContextException("Exception raised while uploading context")
+
             build_task.context = context_filename
         else:
             build_task.dockerfile = dockerfile.build()
 
+        # Configure properties on the docker daemon
         if self.docker_host:
-            build_task.docker_host = self.docker_host
+            build_task.daemon.docker_host = self.docker_host
+        if self.insecure_registries:
+            for registry in [self.pull_registry, self.push_registry]:
+                if registry:
+                    build_task.daemon.insecure_registries.append(registry)
 
         # Pull out the repository from the dockerfile
         try:
@@ -309,20 +358,17 @@ class Scheduler(mesos.interface.Scheduler):
             args.append("--verbose")
 
         task.executor.executor_id.value = task_id
-        task.executor.command.value = "./%s/bin/portainer %s build-executor" % (
+        task.executor.command.value = "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor" % (
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
 
-        # TODO(tarnfeld): Make this configurable
-        # TODO(tarnfeld): Support the mesos 0.20.0 docker protobuf
-        task.executor.command.container.image = "docker://jpetazzo/dind"
-
-        # We have to mount the /var/lib/docker VOLUME inside of the sandbox
-        task.executor.command.container.options.extend(["--privileged"])
-        task.executor.command.container.options.extend(["-v", "$MESOS_DIRECTORY/docker:/var/lib/docker"])
+        if self.container_image:
+            task.executor.container.type = mesos_pb2.ContainerInfo.DOCKER
+            task.executor.container.docker.image = self.container_image
+            task.executor.container.docker.privileged = True
 
         task.executor.name = "build"
-        task.executor.source = "portainer"
+        task.executor.source = "build %s" % (task.name)
 
         # Configure the mesos executor with the portainer executor uri
         portainer_executor = task.executor.command.uris.add()
@@ -337,7 +383,7 @@ class Scheduler(mesos.interface.Scheduler):
         task.data = build_task.SerializeToString()
         task.executor.data = task.data
 
-        # Build up the resources
+        # Build up the resources we require
         cpu_resource = task.resources.add()
         cpu_resource.name = "cpus"
         cpu_resource.type = mesos_pb2.Value.SCALAR
@@ -359,11 +405,11 @@ class Scheduler(mesos.interface.Scheduler):
         """Generate and return a compressed tar archive of the build context."""
 
         if not self.filesystem:
-            raise Exception("A staging filesystem is required for local sources")
+            raise StagingSystemRequiredException("A staging filesystem is required for local sources")
 
         tar = tarfile.open(mode="w:gz", fileobj=output)
         for idx, (cmd, instruction) in enumerate(dockerfile.instructions):
-            if cmd == "ADD":
+            if cmd in ("ADD", "COPY"):
                 local_path, remote_path = instruction
                 tar_path = "context/%s" % str(idx)
 

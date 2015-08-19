@@ -1,5 +1,7 @@
-"""
-"""
+"""The app that runs as the executor, invoked by mesos (thanks to the task info
+sent from the portainer scheduler) as "pid one" of the task. Responsible for
+invoking the docker daemon, then running `docker build` for the task's staged
+context file, and communicating with mesos throughout"""
 
 import docker
 import functools
@@ -69,8 +71,16 @@ class Executor(mesos.interface.Executor):
         def launch_docker_daemon():
             logger.info("Launching docker daemon subprocess")
 
-            # TODO(tarnfeld): This should be made a little more flexible
-            proc = subprocess.Popen(["/usr/local/bin/wrapdocker"])
+            env = dict(os.environ)
+            env["DOCKER_DAEMON_ARGS"] = " -g %s" % (
+                os.path.join(os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"]), "docker")
+            )
+
+            for reg in build_task.daemon.insecure_registries:
+                env["DOCKER_DAEMON_ARGS"] += " --insecure-registry %s" % reg
+
+            # Use the `wrapdocker` script included in our docker image
+            proc = subprocess.Popen(["/usr/local/bin/wrapdocker"], env=env)
 
             self.docker = docker.Client()
             while True:
@@ -85,12 +95,12 @@ class Executor(mesos.interface.Executor):
 
             proc.wait()
 
-        if not build_task.HasField("docker_host"):
+        if not build_task.daemon.HasField("docker_host"):
             daemon_thread = threading.Thread(target=launch_docker_daemon)
             daemon_thread.setDaemon(True)
             daemon_thread.start()
         else:
-            self.docker = docker.Client(build_task.docker_host)
+            self.docker = docker.Client(build_task.daemon.docker_host)
             self.docker_daemon_up = True
 
     def disconnected(self, driver):
@@ -216,10 +226,10 @@ class Executor(mesos.interface.Executor):
                 for message, is_stream in self._wrap_docker_stream(build_request):
                     if not is_stream or (is_stream and buildTask.stream):
                         driver.sendFrameworkMessage(
-                            str("%s: %s" % (image_name, message))
+                            ("%s: %s" % (image_name, message)).encode('unicode-escape')
                         )
             else:
-                sandbox_dir = os.environ["MESOS_DIRECTORY"]
+                sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
                 context_path = os.path.join(sandbox_dir, buildTask.context)
 
                 if not os.path.exists(context_path):
@@ -236,7 +246,7 @@ class Executor(mesos.interface.Executor):
                     for message, is_stream in self._wrap_docker_stream(build_request):
                         if not is_stream or (is_stream and buildTask.stream):
                             driver.sendFrameworkMessage(
-                                str("%s: %s" % (image_name, message))
+                                ("%s: %s" % (image_name, message)).encode('unicode-escape')
                             )
 
             # Extract the newly created image ID

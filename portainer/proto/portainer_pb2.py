@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='proto/portainer.proto',
   package='portainer',
-  serialized_pb='\n\x15proto/portainer.proto\x12\tportainer\"\x91\x01\n\tBuildTask\x12%\n\x05image\x18\x01 \x02(\x0b\x32\x16.portainer.DockerImage\x12\x0f\n\x07\x63ontext\x18\x02 \x01(\t\x12\x12\n\ndockerfile\x18\x06 \x01(\t\x12\x0e\n\x06stream\x18\x05 \x01(\x08\x12\x13\n\x0b\x64ocker_host\x18\x03 \x01(\t\x12\x13\n\x0b\x64ocker_args\x18\x04 \x01(\t\"[\n\x0b\x44ockerImage\x12+\n\x08registry\x18\x02 \x01(\x0b\x32\x19.portainer.DockerRegistry\x12\x12\n\nrepository\x18\x01 \x02(\t\x12\x0b\n\x03tag\x18\x03 \x03(\t\"4\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x10\n\x04port\x18\x02 \x01(\r:\x02\x38\x30')
+  serialized_pb='\n\x15proto/portainer.proto\x12\tportainer\"\x90\x01\n\tBuildTask\x12%\n\x05image\x18\x01 \x02(\x0b\x32\x16.portainer.DockerImage\x12\'\n\x06\x64\x61\x65mon\x18\x07 \x01(\x0b\x32\x17.portainer.DockerDaemon\x12\x0f\n\x07\x63ontext\x18\x02 \x01(\t\x12\x12\n\ndockerfile\x18\x06 \x01(\t\x12\x0e\n\x06stream\x18\x05 \x01(\x08\"[\n\x0b\x44ockerImage\x12+\n\x08registry\x18\x02 \x01(\x0b\x32\x19.portainer.DockerRegistry\x12\x12\n\nrepository\x18\x01 \x02(\t\x12\x0b\n\x03tag\x18\x03 \x03(\t\"4\n\x0e\x44ockerRegistry\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x10\n\x04port\x18\x02 \x01(\r:\x02\x38\x30\"U\n\x0c\x44ockerDaemon\x12\x13\n\x0b\x64ocker_host\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocker_args\x18\x02 \x01(\t\x12\x1b\n\x13insecure_registries\x18\x03 \x03(\t')
 
 
 
@@ -33,37 +33,30 @@ _BUILDTASK = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='context', full_name='portainer.BuildTask.context', index=1,
+      name='daemon', full_name='portainer.BuildTask.daemon', index=1,
+      number=7, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='context', full_name='portainer.BuildTask.context', index=2,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='dockerfile', full_name='portainer.BuildTask.dockerfile', index=2,
+      name='dockerfile', full_name='portainer.BuildTask.dockerfile', index=3,
       number=6, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='stream', full_name='portainer.BuildTask.stream', index=3,
+      name='stream', full_name='portainer.BuildTask.stream', index=4,
       number=5, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='docker_host', full_name='portainer.BuildTask.docker_host', index=4,
-      number=3, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode("", "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='docker_args', full_name='portainer.BuildTask.docker_args', index=5,
-      number=4, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -77,7 +70,7 @@ _BUILDTASK = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=37,
-  serialized_end=182,
+  serialized_end=181,
 )
 
 
@@ -118,8 +111,8 @@ _DOCKERIMAGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=184,
-  serialized_end=275,
+  serialized_start=183,
+  serialized_end=274,
 )
 
 
@@ -153,15 +146,59 @@ _DOCKERREGISTRY = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=277,
-  serialized_end=329,
+  serialized_start=276,
+  serialized_end=328,
+)
+
+
+_DOCKERDAEMON = _descriptor.Descriptor(
+  name='DockerDaemon',
+  full_name='portainer.DockerDaemon',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='docker_host', full_name='portainer.DockerDaemon.docker_host', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='docker_args', full_name='portainer.DockerDaemon.docker_args', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='insecure_registries', full_name='portainer.DockerDaemon.insecure_registries', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=330,
+  serialized_end=415,
 )
 
 _BUILDTASK.fields_by_name['image'].message_type = _DOCKERIMAGE
+_BUILDTASK.fields_by_name['daemon'].message_type = _DOCKERDAEMON
 _DOCKERIMAGE.fields_by_name['registry'].message_type = _DOCKERREGISTRY
 DESCRIPTOR.message_types_by_name['BuildTask'] = _BUILDTASK
 DESCRIPTOR.message_types_by_name['DockerImage'] = _DOCKERIMAGE
 DESCRIPTOR.message_types_by_name['DockerRegistry'] = _DOCKERREGISTRY
+DESCRIPTOR.message_types_by_name['DockerDaemon'] = _DOCKERDAEMON
 
 class BuildTask(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -180,6 +217,12 @@ class DockerRegistry(_message.Message):
   DESCRIPTOR = _DOCKERREGISTRY
 
   # @@protoc_insertion_point(class_scope:portainer.DockerRegistry)
+
+class DockerDaemon(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _DOCKERDAEMON
+
+  # @@protoc_insertion_point(class_scope:portainer.DockerDaemon)
 
 
 # @@protoc_insertion_point(module_scope)

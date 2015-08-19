@@ -40,7 +40,7 @@ When building docker images at scale, it can be time consuming and wasteful to m
 
 Given an existing Apache Mesos cluster, Portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](http://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](http://mesos.apache.org/gettingstarted/).
 
-**Note: If you are _not_ using the External Containerizer + Docker integration (with [our containerizer](http://github.com/duedil-ltd/mesos-docker-containerizer)/[deimos](https://github.com/mesosphere/deimos)) this framework will not work for you as it stands. This also goes for the docker containerizer released in 0.20.0 as it does not support the `--privileged` option.**
+To use the Vagrant box, run `vagrant box add debian-73-x64-virtualbox-nocm http://puppet-vagrant-boxes.puppetlabs.com/debian-73-x64-virtualbox-nocm.box` then `vagrant up`
 
 --------------------------------------------------------------------------------
 
@@ -70,13 +70,21 @@ You'll need to have the following dependencies installed to run the framework, t
 - **Protocol Buffers (`brew install protobuf`)**
 - Make
 
+### Slave Dependencies
+
+By default, Portainer will try and launch an ephemeral docker daemon (`docker -d`) on the mesos slave machine using [docker in docker](github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos slaves. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the docker daemon can be accessed on each slave.
+
+*Note: Make sure you're on Mesos >=0.21.0 to allow for `privileged` containers.*
+
 ## Building Images
 
 #### 1. Upload the Mesos executor
 
-**Note: If the version of Portainer you are using is available as a [github release](http://github.com/duedil-ltd/portainer/releases) you can skip this step and use the github URL.**
+Before being able to use Portainer, you need to upload the executor code somewhere accessible by the Mesos slaves. You can build a tar.gz archive containing the executor by running `bin/build-executor`. The archive will be dumped into `./dist/`, and needs to be uploaded somewhere Mesos can reach it (HDFS, S3, FTP, HTTP etc).
 
-Before being able to use Portainer, you need to upload the executor code somewhere accessible by the Mesos slaves. You can build a tar archive using `make executor`. The archive will be dumped into `./dist/` and needs to be uploaded somewhere Mesos can reach it (HDFS, S3, FTP, HTTP etc).
+The executor is a [pex](https://github.com/pantsbuild/pex) file, meaning it fully encapsulates all dependencies (other than python), and behaves like any old binary. Since some of portainer's dependencies are platform-specific, the pex file is, too. The environment name is tacked on to the archive filename, e.g. `portainer-37cc6d5eb334473fdaa9c7522c4ce585032dca5c.linux-x86_64.tar.gz`. Make sure you build the executor on the same platform as your mesos slaves use.
+
+In future, readily-downloadable prebuild pex files will be available on versioned github releases.
 
 #### 2. Write your `Dockerfile`
 

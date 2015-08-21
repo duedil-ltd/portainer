@@ -513,6 +513,8 @@ class TaskCleanupThread(threading.Thread):
             try:
                 if self.filesystem.isdir(staging_dir):
                     self.filesystem.removedir(staging_dir, force=True)
+                else:
+                    logger.info("Skipping cleanup of directory %s as it doesn't exist", staging_dir)
                 self._queue.task_done()
             except Exception, e:
                 logger.error("Caught exception cleaning staging directory %s (%s)", staging_dir, e)

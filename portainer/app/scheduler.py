@@ -202,13 +202,9 @@ class Scheduler(mesos.interface.Scheduler):
 
         finished = False
         failed = False
-        task_id = None
+        task_id = update.task_id.value
 
-        if update.task_id.value in self.task_ids:
-            build_task = self.task_ids[update.task_id.value]
-            task_id = build_task.image.repository
-        else:
-            task_id = update.task_id.value
+        if update.task_id.value not in self.task_ids:
             logger.error("Task update for unknown task! %s", task_id)
 
         if update.state == mesos_pb2.TASK_STARTING:
@@ -488,7 +484,7 @@ class TaskCleanupThread(threading.Thread):
 
         super(TaskCleanupThread, self).__init__(*args, **kwargs)
 
-        self.setDeemon(True)
+        self.setDaemon(True)
 
     def schedule_cleanup(self, task_id, attempt=0):
 

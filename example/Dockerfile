@@ -8,7 +8,7 @@ MAINTAINER Tom Arnfeld <tom@duedil.com>
 
 REPOSITORY tarnfeld/portainer
 BUILD_CPU 0.1
-BUILD_MEM 512
+BUILD_MEM 256
 
 # Install dependencies
 RUN apt-get update && apt-get install -y build-essential git python-setuptools python-virtualenv

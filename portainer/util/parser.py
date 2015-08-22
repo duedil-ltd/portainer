@@ -8,22 +8,28 @@ from itertools import chain
 def parse_dockerfile(path, **kwargs):
     """Parse a dockerfile and return a new Dockerfile object"""
 
+    with open(path) as fp:
+        return parse_dockerfile_fp(fp, **kwargs)
+
+
+def parse_dockerfile_fp(fp, **kwargs):
+    """
+    """
+
     dockerfile = Dockerfile(**kwargs)
-    with open(path) as f:
+
+    line_buf = ""
+    for line in fp:
+        if line.lstrip().startswith("#") or len(line.rstrip()) == 0:
+            continue
+
+        line_buf += line
+        if line.rstrip().endswith('\\'):
+            continue
+
+        line_buf = line_buf.rstrip().rstrip("\\")
+        dockerfile += line_buf
         line_buf = ""
-        for line in f:
-            if line.lstrip().startswith("#") or len(line.rstrip()) == 0:
-                continue
-
-            line_buf += line
-
-            if line.rstrip().endswith('\\'):
-                continue
-
-            line_buf = line_buf.rstrip().rstrip("\\")
-
-            dockerfile += line_buf
-            line_buf = ""
 
     return dockerfile
 

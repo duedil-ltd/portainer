@@ -10,7 +10,7 @@ import time
 
 from pesos.vendor.mesos import mesos_pb2
 from portainer.app import subcommand
-from portainer.app.scheduler import Scheduler
+from portainer.scheduler import Scheduler
 
 logger = logging.getLogger("portainer.build")
 

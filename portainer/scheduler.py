@@ -38,33 +38,17 @@ class StagingSystemRequiredException(Exception):
 class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
-    def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
-                 staging_uri, stream=False, verbose=False, repository=None,
-                 pull_registry=None, docker_host=None, container_image=None,
-                 insecure_registries=False):
+    def __init__(self, task_queue, executor_uri, staging_uri,
+                 verbose=False, docker_host=None, container_image=None,
+                 push_registry=None, insecure_registries=False):
 
+        self.task_queue = task_queue
         self.executor_uri = executor_uri
-        self.cpu = float(cpu_limit)
-        self.mem = int(mem_limit)
-        self.push_registry = push_registry
-        self.pull_registry = pull_registry
         self.staging_uri = staging_uri
-        self.stream = stream
         self.verbose = verbose
-        self.repository = repository
         self.docker_host = docker_host
         self.container_image = container_image
         self.insecure_registries = insecure_registries
-
-        self.queued_tasks = []
-        for path, tags in tasks:
-            dockerfile = parse_dockerfile(path, registry=pull_registry)
-            self.queued_tasks.append((path, dockerfile, tags))
-
-        self.pending = len(self.queued_tasks)
-        self.running = 0
-        self.finished = 0
-        self.failed = 0
         self.task_ids = {}
 
         self._processing_offers = threading.Lock()
@@ -85,6 +69,7 @@ class Scheduler(mesos.interface.Scheduler):
 
             self.filesystem = opener.opendir(self.staging_uri)
 
+        # Start the task cleanup sthread
         self.cleanup = TaskCleanupThread(self.filesystem)
         self.cleanup.start()
 

@@ -9,6 +9,7 @@ from portainer.app import parser
 # Import all the commands
 import portainer.app.build
 import portainer.app.executor
+import portainer.app.server
 
 
 def main(argv):
@@ -35,7 +36,7 @@ def main(argv):
     formatter = logging.Formatter(fmt="%(asctime)s[%(name)s] %(message)s")
     handler.setFormatter(formatter)
 
-    for logger in ("portainer.build", "portainer.scheduler", "portainer.executor", "pesos",
+    for logger in ("portainer.build", "portainer.scheduler", "portainer.executor", "portainer.server", "pesos",
                    "compactor", "tornado"):
         logger = logging.getLogger(logger)
         logger.propagate = False

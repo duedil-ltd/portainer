@@ -35,6 +35,7 @@ sudo usermod -a -G docker vagrant
 # Download a specific docker binary
 # TODO: Skip the above?
 sudo bash -c "curl -0 https://get.docker.com/builds/Linux/x86_64/docker-1.7.0 > /usr/bin/docker-1.7.0"
+sudo chmod +x /usr/bin/docker-1.7.0
 
 # Set up the docker registry
 sudo mkdir -p /registry

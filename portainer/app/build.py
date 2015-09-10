@@ -19,6 +19,8 @@ def args(parser):
     parser.add_argument("dockerfile", nargs="+")
     parser.add_argument("--executor-uri", dest="executor", required=True,
                         help="URI to the portainer executor for mesos")
+    parser.add_argument("--framework-role", required=False,
+                        help="Framework role to use when registering with mesos")
 
     # Build Arguments
     group = parser.add_argument_group("build")
@@ -59,6 +61,9 @@ def main(args):
     framework = mesos_pb2.FrameworkInfo()
     framework.user = getpass.getuser()
     framework.name = "portainer"
+
+    if args.framework_role:
+        framework.role = args.framework_role
 
     if args.framework_id:
         framework.id.value = args.framework_id

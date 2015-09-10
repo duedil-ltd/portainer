@@ -1,7 +1,7 @@
 
 # Portainer
 
-Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines.
+Portainer is an [Apache Mesos](https://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines.
 
 ```
                    .,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.
@@ -25,7 +25,7 @@ Portainer is an [Apache Mesos](http://mesos.apache.org) framework that enables y
 
 When building docker images at scale, it can be time consuming and wasteful to manage dedicated infrastructure for building and pushing images. Building large containers with many sources and dependencies is a heavy operation, sometimes requiring many large machines. Deploying this infrastructure can be expensive and often leads to poor utilization.
 
-Given an existing Apache Mesos cluster, Portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](http://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](http://mesos.apache.org/gettingstarted/).
+Given an existing Apache Mesos cluster, Portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](https://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](https://mesos.apache.org/gettingstarted/).
 
 See below for more documentation on how to use the Vagrant virtual machine.
 
@@ -61,7 +61,11 @@ You'll need to have the following dependencies installed to run the framework.
 
 By default, Portainer will try and launch an ephemeral docker daemon (`docker -d`) on the mesos agent machine using [docker in docker](github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos agents. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the docker daemon can be accessed on each agent.
 
+<<<<<<< HEAD
 ## Building an Image
+=======
+By default, Portainer will try and launch an ephemeral docker daemon (`docker -d`) on the mesos slave machine using [docker in docker](https://github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos slaves. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the docker daemon can be accessed on each slave.
+>>>>>>> master
 
 #### 1. Build/Upload the Executor
 
@@ -126,7 +130,11 @@ To use the Vagrant box, run `vagrant box add debian-73-x64-virtualbox-nocm http:
 
 The VM runs on a static IP `192.168.33.50` so before proceeding it's best to check that the Mesos UI is fully up and running at http://192.168.33.50:5050/ and there's a slave joined with at least 256MB of RAM. You should also check that the docker registry is up, a simple `docker ps` should demonstrate this.
 
+<<<<<<< HEAD
 ### 3. Build the executor
+=======
+Now that you've got everything set up, you're  good to go. Because Portainer uses a pure-python implementation of the Mesos Framework API ([called pesos](https://github.com/wickman/pesos)), there is no requirement to install Apache Mesos itself to run the framework. You can use the invocation below as an example.
+>>>>>>> master
 
 To build the Portainer executor, simply run `bin/build-executor`.
 

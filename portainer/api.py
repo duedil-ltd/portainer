@@ -164,7 +164,7 @@ class BuildHandler(tornado.web.RequestHandler):
 
         build_task = portainer_pb2.BuildTask()
         build_task.stream = vebose
-        build_task.context = None  # TODO
+        build_task.context = "context.tar.gz"
 
         repo = parse_repository(repository_tag)
         build_task.image.registry.hostname = repo.registry_host

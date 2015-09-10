@@ -28,7 +28,7 @@ sleep 5
 
 # Install Docker
 sudo bash -c 'echo "deb http://http.debian.net/debian wheezy-backports main" > /etc/apt/sources.list.d/backports.list'
-sudo apt-get install -t wheezy-backports linux-image-amd64
+sudo apt-get install -y linux-image-amd64
 curl -sSL https://get.docker.com/ | sh
 sudo usermod -a -G docker vagrant
 
@@ -46,7 +46,7 @@ sudo service mesos-master start
 sudo service mesos-slave start
 
 # Install portainer dependencies
-sudo apt-get install python-setuptools
+sudo apt-get install -y python-setuptools
 sudo easy_install pip
 sudo pip install virtualenv
 SCRIPT

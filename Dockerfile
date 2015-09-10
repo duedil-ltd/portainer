@@ -6,10 +6,6 @@
 FROM ubuntu:12.04
 MAINTAINER Tom Arnfeld <tom@duedil.com>
 
-REPOSITORY tarnfeld/portainer
-BUILD_CPU 0.1
-BUILD_MEM 512
-
 # Install dependencies
 RUN apt-get update && apt-get install -y build-essential git python-setuptools python-virtualenv
 
@@ -17,7 +13,7 @@ RUN apt-get update && apt-get install -y build-essential git python-setuptools p
 RUN useradd portainer
 
 # Install the portainer source code
-ADD ../ /opt/portainer
+ADD ./ /opt/portainer
 
 # Setup the python virtualenv
 RUN chown -R portainer: /opt/portainer

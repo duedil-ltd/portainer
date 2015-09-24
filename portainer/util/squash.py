@@ -1,4 +1,4 @@
-
+import tarfile
 import json
 import tempfile
 import os
@@ -14,8 +14,11 @@ def get_squash_layers(docker, base_image_id, head_image_id):
     get_squash_layers(base = A, head = D)
         would return [D, C, B]
 
-    The function will return a tuple, where the first item is the size of all
-    layers (in bytes) and the second is the ordered list of layers.
+    The function will return a tuple of the following items;
+         - Base Image ID
+         - Head Image ID
+         - Size of all layers in bytes
+         - Ordered list of layers (top-down)
     """
 
     # Pull out the full image IDs from the docker API
@@ -31,7 +34,7 @@ def get_squash_layers(docker, base_image_id, head_image_id):
         layers.append(layer["Id"])
         aggregate_size += layer["Size"]
 
-    return aggregate_size, layers
+    return base_image_id, head_image_id, aggregate_size, layers
 
 
 def download_layers_for_image(docker, directory, image_id):
@@ -74,7 +77,7 @@ def extract_layer_tar(directory, layers_tar, layer_id):
         path=path
     )
 
-    return open(path, "wb+")
+    return open(os.path.join(path, layer_member))
 
 
 def apply_layer(directory, layer_tar, seen_paths=set()):
@@ -84,7 +87,7 @@ def apply_layer(directory, layer_tar, seen_paths=set()):
     that have already been seen by previous layers.
     """
 
-    for member in layer_tar.members():
+    for member in layer_tar.getnames():
         parent, leaf = os.path.split(member)
         if member.startswith(".wh..wh."):
             continue
@@ -99,7 +102,7 @@ def apply_layer(directory, layer_tar, seen_paths=set()):
             with open(os.path.join(directory, member), "wb") as fh:
                 fh.write("")
         elif member not in seen_paths:
-            layer.extract(member=member, path=directory)
+            layer_tar.extract(member=member, path=directory)
             seen_paths.add(member)
 
     return seen_paths

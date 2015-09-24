@@ -331,8 +331,10 @@ class Executor(mesos.interface.Executor):
         driver.sendFrameworkMessage(str("%s: Squashing image" % image_name))
 
         # Figure out which layers need to be squashed
-        total_bytes, new_layers = get_squash_layers(self.docker, base_image_id, head_image_id)
-        total_mb = total_bytes / 1024 / 1024
+        base_image_id, head_image_id, total_bytes, new_layers = get_squash_layers(
+            self.docker, base_image_id, head_image_id
+        )
+        total_mb = total_bytes / 1024.0 / 1024.0
 
         driver.sendFrameworkMessage(str("%s:  ---> Squashing %d layers (%.2fMB)" % (image_name, len(new_layers), total_mb)))
 
@@ -359,7 +361,7 @@ class Executor(mesos.interface.Executor):
 
         # Generate a tarball of the final squashed layer
         driver.sendFrameworkMessage(str("%s:  ---> Creating tar for squashed layer" % image_name))
-        new_layer_tarball_path = generate_tarball(directory, working_dir)
+        new_layer_tarball_path = generate_tarball(sandbox_dir, working_dir)
 
         # Generate a tarball of the new layer that we can send to docker
         driver.sendFrameworkMessage(str("%s:  ---> Creating image tarball for image %s with parent %s" % (image_name, head_image_id[:12], base_image_id[:12])))

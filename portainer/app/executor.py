@@ -24,6 +24,8 @@ from pesos.vendor.mesos import mesos_pb2
 
 from portainer.app import subcommand
 from portainer.proto import portainer_pb2
+from portainer.util.squash import get_squash_layers, download_layers_for_image, \
+    extract_layer_tar, apply_layer, generate_tarball, rewrite_image_parent
 
 
 logger = logging.getLogger("portainer.executor")

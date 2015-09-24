@@ -42,7 +42,7 @@ def args(parser):
                        help="Docker image to run the portainer executor in")
     group.add_argument("--insecure", default=False, action="store_true",
                        help="Enable pulling/pushing of images with insecure registries")
-    group.add_argument("--squash", default=True, action="store_true",
+    group.add_argument("--squash", default=False, action="store_true",
                        help="Squash the layers of the built image into a single one")
 
     # Arguments for the staging filesystem

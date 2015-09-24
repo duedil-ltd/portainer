@@ -328,91 +328,57 @@ class Executor(mesos.interface.Executor):
         logger.info("Squashing image from %s to %s", base_image_id[:12], head_image_id[:12])
         driver.sendFrameworkMessage(str("%s: Squashing image" % image_name))
 
-        head_image_id = self.docker.inspect_image(head_image_id)["Id"]
-
-        new_layers = []  # List of layers from HEAD -> BASE (not including BASE)
-        total_mb = 0
-        for layer in json.loads(self.docker.history(head_image_id)):
-            if layer["Id"].startswith(base_image_id):
-                base_image_id = layer["Id"]
-                break
-            new_layers.append(layer["Id"])
-            total_mb += layer["Size"] / 1024.0 / 1024.0
+        # Figure out which layers need to be squashed
+        total_bytes, new_layers = get_squash_layers(self.docker, base_image_id, head_image_id)
+        total_mb = total_bytes / 1024 / 1024
 
         driver.sendFrameworkMessage(str("%s:  ---> Squashing %d layers (%.2fMB)" % (image_name, len(new_layers), total_mb)))
 
         # Download a tarball of the image layers
         driver.sendFrameworkMessage(str("%s:  ---> Exporting image from docker daemon" % image_name))
-        _, layers_tar_name = tempfile.mkstemp(dir=sandbox_dir, suffix=".tar")
-        layers_tar_fh = open(layers_tar_name, "wb+")
-        for chunk in self.docker.get_image(head_image_id).stream():
-            layers_tar_fh.write(chunk)
-
-        layers_tar_fh.seek(0)
+        layers_tar_fh = download_layers_for_image(self.docker, sandbox_dir, head_image_id)
         layers_tar = tarfile.open(fileobj=layers_tar_fh)
 
-        # Loop over each layer applying the contents to the final image
-        # directory (root_fs_dir)
-        root_fs_dir = tempfile.mkdtemp(dir=sandbox_dir)
+        # Create a working directory for applying all of the layers into, this is the directory
+        # that will contain the final state of our squashed image.
+        working_dir = tempfile.mkdtemp(dir=sandbox_dir)
         seen_paths = set()
+
+        # Iterate over the layers, applying them in reverse order
         for layer_id in new_layers:
             short_layer_id = layer_id[:12]
 
             driver.sendFrameworkMessage(str("%s:  ---> Extracting layer %s" % (image_name, short_layer_id)))
-            layer_tar_path = tempfile.mkdtemp(dir=sandbox_dir)
-            layer_member = os.path.join(layer_id, "layer.tar")
-            layers_tar.extract(
-                member=layer_member,
-                path=layer_tar_path
-            )
-
-            layer = tarfile.open(os.path.join(layer_tar_path, layer_member))
+            layer_tar_fh = extract_layer_tar(sandbox_dir, layers_tar, layer_id)
+            layer_tar = tarfile.open(fileobj=layer_tar_fh)
 
             driver.sendFrameworkMessage(str("%s:      -> Applying layer %s" % (image_name, short_layer_id)))
-            for member in layer.getnames():
-                parent, leaf = os.path.split(member)
-                if member.startswith(".wh..wh"):
-                    logger.info("Skipped whiteout file %s", member)
-                    continue
-                if leaf.startswith(".wh."):
-                    seen_paths.add(os.path.join(parent, leaf[4:]))
-                    try:
-                        os.makedirs(os.path.dirname(os.path.join(root_fs_dir, member)))
-                    except:
-                        pass
-                    with open(os.path.join(root_fs_dir, member), "wb") as fh:
-                        fh.write("")
-                elif member not in seen_paths:
-                    layer.extract(member=member, path=root_fs_dir)
-                    seen_paths.add(member)
+            seen_paths = apply_layer(working_dir, layer_tar, seen_paths)
 
-        # Generate the new layer tarball
+        # Generate a tarball of the final squashed layer
         driver.sendFrameworkMessage(str("%s:  ---> Creating tar for squashed layer" % image_name))
-        _, new_layer_tarball_path = tempfile.mkstemp(dir=sandbox_dir, suffix=".tar")
-        new_layer_tarball = tarfile.open(new_layer_tarball_path, "w")
-        for path in os.listdir(root_fs_dir):
-            new_layer_tarball.add(os.path.join(root_fs_dir, path), arcname=path)
-        new_layer_tarball.close()
+        new_layer_tarball_path = generate_tarball(directory, working_dir)
 
-        # Generate the new image tarball
+        # Generate a tarball of the new layer that we can send to docker
         driver.sendFrameworkMessage(str("%s:  ---> Creating image tarball for image %s with parent %s" % (image_name, head_image_id[:12], base_image_id[:12])))
+
         _, new_image_tarball_path = tempfile.mkstemp(dir=sandbox_dir, suffix=".tar.gz")
         new_image_tarball = tarfile.open(new_image_tarball_path, "w:gz")
         new_image_tarball.add(new_layer_tarball_path, arcname=os.path.join(head_image_id, "layer.tar"))
 
+        # Extract the `VERSION` and `json` files from the original image tarball, so that we
+        # can modify them.
         layers_tar.extract(os.path.join(head_image_id, "VERSION"), path=sandbox_dir)
         layers_tar.extract(os.path.join(head_image_id, "json"), path=sandbox_dir)
 
-        image_info = None
-        with open(os.path.join(sandbox_dir, head_image_id, "json"), "r") as json_info:
-            image_info = json.load(json_info)
-
-        image_info["parent"] = base_image_id
-        image_info["config"]["Image"] = base_image_id
-        image_info["container_config"]["Image"] = base_image_id
-        with open(os.path.join(sandbox_dir, head_image_id, "json"), "w") as json_info:
+        # Re-write the parent image ID
+        with open(os.path.join(sandbox_dir, head_image_id, "json"), "r+") as json_info:
+            image_info = rewrite_image_parent(json.load(json_info), base_image_id)
+            json_info.seek(0)
             json.dump(image_info, json_info)
+            json_info.truncate()
 
+        # Add the `VERSION` and `json` files into the tarball
         new_image_tarball.add(os.path.join(sandbox_dir, head_image_id, "VERSION"), arcname=os.path.join(head_image_id, "VERSION"))
         new_image_tarball.add(os.path.join(sandbox_dir, head_image_id, "json"), arcname=os.path.join(head_image_id, "json"))
 

@@ -99,12 +99,14 @@ def apply_layer(directory, layer_tar, seen_paths=set()):
         if member.startswith(".wh..wh."):
             continue
         elif leaf.startswith(".wh."):
-            seen_paths.add(os.path.join(parent, leaf[4:]))
-            wh_path = os.path.join(directory, member)
-            wh_parent = os.path.dirname(wh_path)
-            if wh_parent != directory:
-                mkdir_p(wh_parent)
-            touch(wh_path)
+            name = os.path.join(parent, leaf[4:])
+            if name not in seen_paths:
+                seen_paths.add(name)
+                wh_path = os.path.join(directory, member)
+                wh_parent = os.path.dirname(wh_path)
+                if wh_parent != directory:
+                    mkdir_p(wh_parent)
+                touch(wh_path)
         elif member not in seen_paths:
             layer_tar.extract(member=member, path=directory)
             seen_paths.add(member)

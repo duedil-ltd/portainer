@@ -6,7 +6,7 @@ from cStringIO import StringIO
 from mock import patch, MagicMock
 
 from .squash import get_squash_layers, download_layers_for_image, \
-    extract_layer_tar, apply_layer
+    extract_layer_tar, apply_layer, rewrite_image_parent
 
 
 @patch('docker.client.Client')
@@ -262,3 +262,22 @@ class ApplyLayerTestCase(unittest.TestCase):
             new_dirs,
             seen_paths
         )
+
+
+class RewriteImageParentTestCase(unittest.TestCase):
+
+    def test_rewrite_parent(self):
+
+        self.assertDictEqual(rewrite_image_parent({
+            "parent": None,
+            "config": {},
+            "container_config": {}
+        }, "A"), {
+            "parent": "A",
+            "config": {
+                "Image": "A"
+            },
+            "container_config": {
+                "Image": "A"
+            }
+        })

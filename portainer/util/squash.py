@@ -6,22 +6,26 @@ import os
 
 def get_squash_layers(docker, base_image_id, head_image_id):
     """
-    get_squash_layers will return an ordered list of layers since `base_image_id`
-    that should be squashed together to form `head_image_id`. For example;
+    get_squash_layers will return an ordered list of the layers between `base_image_id`
+    and `head_image_id`, including `head_image_id`. This list can be used to determine
+    the layers that should be squashed together. For example, given this image
+    lineage;
 
-    [A] -> [B] -> [C] -> [D]
+    [A] <- [B] <- [C] <- [D]
 
-    get_squash_layers(base = A, head = D)
-        would return [D, C, B]
+    get_squash_layers(base = A, head = D) would return [D, C, B]
 
     The function will return a tuple of the following items;
-         - Base Image ID
-         - Head Image ID
-         - Size of all layers in bytes
-         - Ordered list of layers (top-down)
+     - Base Image ID
+     - Head Image ID
+     - Size of all layers in bytes
+     - Ordered list of layers (top-down)
     """
 
-    # Pull out the full image IDs from the docker API
+    # Pull out the full image IDs from the docker API, we might be given
+    # short hashes so we need to be sure we have the full ones. This also
+    # serves as a nice check to be sure the images exist in the docker
+    # daemon.
     head_image_id = docker.inspect_image(head_image_id)["Id"]
     base_image_id = docker.inspect_image(base_image_id)["Id"]
 

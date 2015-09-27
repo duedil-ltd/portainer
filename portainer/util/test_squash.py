@@ -2,7 +2,7 @@ import json
 import unittest
 from mock import patch
 
-from .squash import get_squash_layers, download_layers_for_image
+from .squash import get_squash_layers, download_layers_for_image, extract_layer_tar
 
 
 @patch('docker.client.Client')
@@ -57,3 +57,19 @@ class DownloadImageLayersTestCase(unittest.TestCase):
         self.assertEqual(fh.read(1), "")
 
         fh.close()
+
+
+@patch('tarfile.TarFile')
+class LayerExctractionFromTarTestCase(unittest.TestCase):
+
+    @patch('portainer.util.squash.tempfile.mkdtemp', return_value="/tmp/path")
+    @patch('portainer.util.squash.open', return_value='fh')
+    def test_extraction(self, tempfile, tarfile, mock_open):
+
+        tar_fh = extract_layer_tar('/tmp', tarfile, 'A')
+        self.assertEqual(tar_fh, 'fh')
+
+        tarfile.extract.assert_called_with(
+            member='A/layer.tar',
+            path='/tmp/path'
+        )

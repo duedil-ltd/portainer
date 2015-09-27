@@ -2,7 +2,7 @@ import json
 import unittest
 from mock import patch
 
-from .squash import get_squash_layers
+from .squash import get_squash_layers, download_layers_for_image
 
 
 @patch('docker.client.Client')
@@ -38,3 +38,22 @@ class SquashLayersTestCase(unittest.TestCase):
         self.assertEqual(new_head_image, "_%s" % head_image)
         self.assertEqual(size, 1024 * (len(lineage) - 1))
         self.assertListEqual(layers, lineage[:-1])
+
+
+@patch('docker.client.Client')
+@patch('requests.Response')
+class DownloadImageLayersTestCase(unittest.TestCase):
+
+    def test_download_image_layers(self, docker, response):
+
+        docker.get_image.return_value = response
+        response.stream.return_value = "\x00\x00\x00\x00"
+
+        fh = download_layers_for_image(docker, "/tmp", "A")
+        docker.get_image.assert_called_with("A")
+
+        self.assertEqual(fh.tell(), 0)
+        self.assertEqual(fh.read(4), "\x00\x00\x00\x00")
+        self.assertEqual(fh.read(1), "")
+
+        fh.close()

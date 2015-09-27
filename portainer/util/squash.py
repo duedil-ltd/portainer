@@ -3,6 +3,8 @@ import json
 import tempfile
 import os
 
+from .fs import touch, mkdir_p
+
 
 def get_squash_layers(docker, base_image_id, head_image_id):
     """
@@ -93,18 +95,16 @@ def apply_layer(directory, layer_tar, seen_paths=set()):
 
     for member in layer_tar.getnames():
         parent, leaf = os.path.split(member)
+
         if member.startswith(".wh..wh."):
             continue
         elif leaf.startswith(".wh."):
             seen_paths.add(os.path.join(parent, leaf[4:]))
-            try:
-                os.makedirs(
-                    os.path.dirname(os.path.join(directory, member))
-                )
-            except:
-                pass
-            with open(os.path.join(directory, member), "wb") as fh:
-                fh.write("")
+            wh_path = os.path.join(directory, member)
+            wh_parent = os.path.dirname(wh_path)
+            if wh_parent != directory:
+                mkdir_p(wh_parent)
+            touch(wh_path)
         elif member not in seen_paths:
             layer_tar.extract(member=member, path=directory)
             seen_paths.add(member)

@@ -8,7 +8,7 @@ def touch(path, times=None):
     empty files.
     """
 
-    with open(path):
+    with open(path, "a"):
         os.utime(path, times)
 
 

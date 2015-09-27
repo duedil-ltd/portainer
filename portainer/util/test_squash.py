@@ -1,8 +1,12 @@
 import json
+import tarfile
+import tempfile
 import unittest
-from mock import patch
+from cStringIO import StringIO
+from mock import patch, MagicMock
 
-from .squash import get_squash_layers, download_layers_for_image, extract_layer_tar
+from .squash import get_squash_layers, download_layers_for_image, \
+    extract_layer_tar, apply_layer
 
 
 @patch('docker.client.Client')
@@ -64,12 +68,197 @@ class LayerExctractionFromTarTestCase(unittest.TestCase):
 
     @patch('portainer.util.squash.tempfile.mkdtemp', return_value="/tmp/path")
     @patch('portainer.util.squash.open', return_value='fh')
-    def test_extraction(self, tempfile, tarfile, mock_open):
+    def test_extraction(self, tempfile, _tarfile, mock_open):
 
-        tar_fh = extract_layer_tar('/tmp', tarfile, 'A')
+        tar_fh = extract_layer_tar('/tmp', _tarfile, 'A')
         self.assertEqual(tar_fh, 'fh')
 
-        tarfile.extract.assert_called_with(
+        _tarfile.extract.assert_called_with(
             member='A/layer.tar',
             path='/tmp/path'
+        )
+
+
+class ApplyLayerTestCase(unittest.TestCase):
+
+    def test_apply_single_layer_added_files(self):
+
+        extracted, touched, dirs, seen = self._apply_layer(files=[
+            tarfile.TarInfo("a"),
+            tarfile.TarInfo("b"),
+            tarfile.TarInfo("c/d"),
+        ], seen_paths=set())
+
+        self.assertListEqual(extracted, ["a", "b", "c/d"])
+        self.assertListEqual(touched, [])
+        self.assertListEqual(dirs, [])
+        self.assertSetEqual(seen, {"a", "b", "c/d"})
+
+    def test_apply_single_layer_deleted_files(self):
+
+        extracted, touched, dirs, seen = self._apply_layer(files=[
+            tarfile.TarInfo(".wh.a"),
+            tarfile.TarInfo(".wh.b"),
+            tarfile.TarInfo("c/.wh.d"),
+        ], seen_paths=set())
+
+        self.assertListEqual(extracted, [])
+        self.assertListEqual(touched, [".wh.a", ".wh.b", 'c/.wh.d'])
+        self.assertListEqual(dirs, ['c'])
+        self.assertSetEqual(seen, {"a", "b", "c/d"})
+
+    def test_apply_single_layer_no_files(self):
+
+        extracted, touched, dirs, seen = self._apply_layer(files=[], seen_paths=set())
+
+        self.assertListEqual(extracted, [])
+        self.assertListEqual(touched, [])
+        self.assertListEqual(dirs, [])
+        self.assertSetEqual(seen, set())
+
+    def test_apply_multiple_layers_added_files(self):
+
+        extracted, touched, dirs, seen = self._apply_layers(layers=[
+            [
+                tarfile.TarInfo("a"),
+                tarfile.TarInfo("c/d"),
+            ],
+            [
+                tarfile.TarInfo("b"),
+                tarfile.TarInfo("c/e"),
+            ]
+        ])
+
+        self.assertListEqual(extracted, ["a", "c/d", "b", "c/e"])
+        self.assertListEqual(touched, [])
+        self.assertListEqual(dirs, [])
+        self.assertSetEqual(seen, {"a", "c/d", "b", "c/e"})
+
+    def test_apply_multiple_layers_deleted_files(self):
+
+        extracted, touched, dirs, seen = self._apply_layers(layers=[
+            [
+                tarfile.TarInfo(".wh.a"),
+            ],
+            [
+                tarfile.TarInfo(".wh.b"),
+                tarfile.TarInfo("c/.wh.d"),
+            ]
+        ])
+
+        self.assertListEqual(extracted, [])
+        self.assertListEqual(touched, [".wh.a", ".wh.b", "c/.wh.d"])
+        self.assertListEqual(dirs, ["c"])
+        self.assertSetEqual(seen, {"a", "b", "c/d"})
+
+    def test_apply_multiple_layers_mixed(self):
+
+        extracted, touched, dirs, seen = self._apply_layers(layers=[
+            [
+                tarfile.TarInfo("a"),
+            ],
+            [
+                tarfile.TarInfo("b"),
+                tarfile.TarInfo("c/e"),
+                tarfile.TarInfo(".wh.a"),
+                tarfile.TarInfo(".wh.f"),
+            ],
+            [
+                tarfile.TarInfo("a"),
+                tarfile.TarInfo("c/d"),
+                tarfile.TarInfo(".wh.b"),
+            ]
+        ])
+
+        self.assertListEqual(extracted, ["a", "b", "c/e", "c/d"])
+        self.assertListEqual(touched, [".wh.f"])
+        self.assertListEqual(dirs, [])
+        self.assertSetEqual(seen, {"a", "b", "c/e", "f", "c/d"})
+
+    def test_apply_multiple_layers_add_remove(self):
+
+        extracted, touched, dirs, seen = self._apply_layers(layers=[
+            [
+                tarfile.TarInfo(".wh.a"),
+            ],
+            [
+                tarfile.TarInfo("a"),
+            ]
+        ])
+
+        self.assertListEqual(extracted, [])
+        self.assertListEqual(touched, [".wh.a"])
+        self.assertListEqual(dirs, [])
+        self.assertSetEqual(seen, {"a"})
+
+    def test_apply_multiple_layers_remove_add(self):
+
+        extracted, touched, dirs, seen = self._apply_layers(layers=[
+            [
+                tarfile.TarInfo("a"),
+            ],
+            [
+                tarfile.TarInfo(".wh.a"),
+            ]
+        ])
+
+        self.assertListEqual(extracted, ["a"])
+        self.assertListEqual(touched, [])
+        self.assertListEqual(dirs, [])
+        self.assertSetEqual(seen, {"a"})
+
+    def _apply_layer(self, files, seen_paths):
+
+        extracted_files = []
+        touched_files = []
+        new_dirs = []
+
+        def extract_file(member, path):
+            extracted_files.append(member)
+
+        def touch_file(path):
+            # Remove the /tmp/ prefix to make writing tests simpler
+            touched_files.append(path[4:].lstrip("/"))
+
+        def make_dir(path):
+            # Remove the /tmp/ prefix to make writing tests simpler
+            new_dirs.append(path[4:].lstrip("/"))
+
+        with patch("portainer.util.squash.touch", side_effect=touch_file):
+            with patch("portainer.util.squash.mkdir_p", side_effect=make_dir):
+                with tempfile.TemporaryFile() as tar_fh:
+                    tar = tarfile.open(fileobj=tar_fh, mode="w")
+
+                    for info in files:
+                        tar.addfile(info, fileobj=StringIO("\x00"))
+
+                    tar.extract = MagicMock(side_effect=extract_file)
+
+                    return (
+                        extracted_files,
+                        touched_files,
+                        new_dirs,
+                        apply_layer('/tmp', tar, seen_paths)
+                    )
+
+    def _apply_layers(self, layers):
+
+        extracted_files = []
+        touched_files = []
+        new_dirs = []
+        seen_paths = set()
+
+        for files in layers:
+            e, t, n, p = self._apply_layer(files, seen_paths)
+
+            extracted_files.extend(e)
+            touched_files.extend(t)
+            new_dirs.extend(n)
+            seen_paths.update(p)
+
+        return (
+            extracted_files,
+            touched_files,
+            new_dirs,
+            seen_paths
         )

@@ -11,6 +11,5 @@ EXPOSE 8080
 RUN rm /c/b
 VOLUME /baz
 EXPOSE 3000
-# RUN echo > /bin/hostname
 RUN rm /bin/ping
-# RUN rm /bin/hostname
+RUN echo 3 > /b

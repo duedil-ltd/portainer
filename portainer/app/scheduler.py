@@ -161,44 +161,46 @@ class Scheduler(mesos.interface.Scheduler):
                     # Remove all of the tasks that are about to be launched
                     self.queued_tasks = filter(None, self.queued_tasks)
 
-            # Launch the build tasks on the mesos cluster
-            for offer, path, dockerfile, tags, cpu, mem, role in tasks_to_launch:
-                # Generate a task ID
-                task_id = str(uuid.uuid1())
+        # Launch the build tasks on the mesos cluster
+        # We do this outside of the _processing_offers lock because if there are
+        # any tasks, we've already taken them off the queue to be launched.
+        for offer, path, dockerfile, tags, cpu, mem, role in tasks_to_launch:
+            # Generate a task ID
+            task_id = str(uuid.uuid1())
 
-                try:
-                    tasks = [self._prepare_task(
-                        driver=driver,
-                        task_id=task_id,
-                        path=path,
-                        dockerfile=dockerfile,
-                        tags=tags,
-                        offer=offer,
-                        cpu=cpu,
-                        mem=mem,
-                        role=role
-                    )]
-                except TaskContextException as e:
-                    logger.error("Caught exception: %s", e.message)
-                    self.failed += 1
-                    self.running -= 1
-                    tasks = []
-                except StagingSystemRequiredException as e:
-                    logger.error("Caught exception: %s", e.message)
-                    self.failed += 1
-                    self.running -= 1
-                    tasks = []
+            try:
+                tasks = [self._prepare_task(
+                    driver=driver,
+                    task_id=task_id,
+                    path=path,
+                    dockerfile=dockerfile,
+                    tags=tags,
+                    offer=offer,
+                    cpu=cpu,
+                    mem=mem,
+                    role=role
+                )]
+            except TaskContextException as e:
+                logger.error("Caught exception: %s", e.message)
+                self.failed += 1
+                self.running -= 1
+                tasks = []
+            except StagingSystemRequiredException as e:
+                logger.error("Caught exception: %s", e.message)
+                self.failed += 1
+                self.running -= 1
+                tasks = []
 
-                if not tasks:
-                    logger.error("Task %s failed to launch", task_id)
+            if not tasks:
+                logger.error("Task %s failed to launch", task_id)
 
-                    # If there's no pending tasks or any tasks running, stop
-                    # the driver.
-                    if (self.pending + self.running) == 0:
-                        driver.stop()
-                else:
-                    logger.info("Launching %d tasks", len(tasks))
-                    driver.launchTasks([offer.id], tasks)
+                # If there's no pending tasks or any tasks running, stop
+                # the driver.
+                if (self.pending + self.running) == 0:
+                    driver.stop()
+            else:
+                logger.info("Launching %d tasks", len(tasks))
+                driver.launchTasks([offer.id], tasks)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""

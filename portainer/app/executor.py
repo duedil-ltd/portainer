@@ -17,11 +17,15 @@ import subprocess
 import threading
 import time
 import traceback
+import tempfile
+import tarfile
 
 from pesos.vendor.mesos import mesos_pb2
 
 from portainer.app import subcommand
 from portainer.proto import portainer_pb2
+from portainer.util.squash import get_squash_layers, download_layers_for_image, \
+    extract_layer_tar, apply_layer, generate_tarball, rewrite_image_parent
 
 
 logger = logging.getLogger("portainer.executor")
@@ -217,6 +221,10 @@ class Executor(mesos.interface.Executor):
             image_name = registry_url + buildTask.image.repository
             logger.info("Building image %s", image_name)
 
+            # Used to store the ID of the image the build is based on, if any
+            base_image_id = None
+
+            sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
             if buildTask.dockerfile:
                 build_request = self.docker.build(
                     fileobj=io.StringIO(buildTask.dockerfile),
@@ -224,12 +232,13 @@ class Executor(mesos.interface.Executor):
                 )
 
                 for message, is_stream in self._wrap_docker_stream(build_request):
+                    if message.startswith(u" ---\u003e") and not base_image_id:
+                        base_image_id = message[6:]
                     if not is_stream or (is_stream and buildTask.stream):
                         driver.sendFrameworkMessage(
                             ("%s: %s" % (image_name, message)).encode('unicode-escape')
                         )
             else:
-                sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
                 context_path = os.path.join(sandbox_dir, buildTask.context)
 
                 if not os.path.exists(context_path):
@@ -244,6 +253,8 @@ class Executor(mesos.interface.Executor):
                     )
 
                     for message, is_stream in self._wrap_docker_stream(build_request):
+                        if message.startswith(u" ---\u003e") and not base_image_id:
+                            base_image_id = message[6:]
                         if not is_stream or (is_stream and buildTask.stream):
                             driver.sendFrameworkMessage(
                                 ("%s: %s" % (image_name, message)).encode('unicode-escape')
@@ -254,6 +265,20 @@ class Executor(mesos.interface.Executor):
             if not match:
                 raise Exception("Failed to match image ID from %r" % message)
             image_id = match.group(1)
+
+            # If we've been asked to squash all of the layers for this build into
+            # one, do it.
+            if buildTask.HasField("squash") and buildTask.squash:
+                if not base_image_id:
+                    raise Exception("Failed to extract the base image ID to squash against")
+
+                image_id = self._squash_image(
+                    driver,
+                    sandbox_dir,
+                    image_name,
+                    base_image_id,
+                    image_id
+                )
 
             # Tag the image with all the required tags
             tags = buildTask.image.tag or ["latest"]
@@ -294,3 +319,79 @@ class Executor(mesos.interface.Executor):
 
             # Re-raise the exception for logging purposes and to terminate the thread
             raise
+
+    def _squash_image(self, driver, sandbox_dir, image_name,
+                      base_image_id, head_image_id):
+        """
+        This method will take the given ImageID and squash all of the layers that
+        make it up into a single one. The new ImageID will be returned.
+        """
+
+        logger.info("Squashing image from %s to %s", base_image_id[:12], head_image_id[:12])
+        driver.sendFrameworkMessage(str("%s: Squashing image" % image_name))
+
+        # Figure out which layers need to be squashed
+        base_image_id, head_image_id, total_bytes, new_layers = get_squash_layers(
+            self.docker, base_image_id, head_image_id
+        )
+        total_mb = total_bytes / 1024.0 / 1024.0
+
+        driver.sendFrameworkMessage(str("%s:  ---> Squashing %d layers (%.2fMB)" % (image_name, len(new_layers), total_mb)))
+
+        # Download a tarball of the image layers
+        driver.sendFrameworkMessage(str("%s:  ---> Exporting image from docker daemon" % image_name))
+        layers_tar_fh = download_layers_for_image(self.docker, sandbox_dir, head_image_id)
+        layers_tar = tarfile.open(fileobj=layers_tar_fh)
+
+        # Create a working directory for applying all of the layers into, this is the directory
+        # that will contain the final state of our squashed image.
+        working_dir = tempfile.mkdtemp(dir=sandbox_dir)
+        seen_paths = set()
+
+        # Iterate over the layers, applying them in reverse order
+        for layer_id in new_layers:
+            short_layer_id = layer_id[:12]
+
+            driver.sendFrameworkMessage(str("%s:  ---> Extracting layer %s" % (image_name, short_layer_id)))
+            layer_tar_fh = extract_layer_tar(sandbox_dir, layers_tar, layer_id)
+            layer_tar = tarfile.open(fileobj=layer_tar_fh)
+
+            driver.sendFrameworkMessage(str("%s:      -> Applying layer %s" % (image_name, short_layer_id)))
+            seen_paths = apply_layer(working_dir, layer_tar, seen_paths)
+
+        # Generate a tarball of the final squashed layer
+        driver.sendFrameworkMessage(str("%s:  ---> Creating tar for squashed layer" % image_name))
+        new_layer_tarball_path = generate_tarball(sandbox_dir, working_dir)
+
+        # Generate a tarball of the new layer that we can send to docker
+        driver.sendFrameworkMessage(str("%s:  ---> Creating image tarball for image %s with parent %s" % (image_name, head_image_id[:12], base_image_id[:12])))
+
+        _, new_image_tarball_path = tempfile.mkstemp(dir=sandbox_dir, suffix=".tar.gz")
+        new_image_tarball = tarfile.open(new_image_tarball_path, "w:gz")
+        new_image_tarball.add(new_layer_tarball_path, arcname=os.path.join(head_image_id, "layer.tar"))
+
+        # Extract the `VERSION` and `json` files from the original image tarball, so that we
+        # can modify them.
+        layers_tar.extract(os.path.join(head_image_id, "VERSION"), path=sandbox_dir)
+        layers_tar.extract(os.path.join(head_image_id, "json"), path=sandbox_dir)
+
+        # Re-write the parent image ID
+        with open(os.path.join(sandbox_dir, head_image_id, "json"), "r+") as json_info:
+            image_info = rewrite_image_parent(json.load(json_info), base_image_id)
+            json_info.seek(0)
+            json.dump(image_info, json_info)
+            json_info.truncate()
+
+        # Add the `VERSION` and `json` files into the tarball
+        new_image_tarball.add(os.path.join(sandbox_dir, head_image_id, "VERSION"), arcname=os.path.join(head_image_id, "VERSION"))
+        new_image_tarball.add(os.path.join(sandbox_dir, head_image_id, "json"), arcname=os.path.join(head_image_id, "json"))
+
+        new_image_tarball.close()
+
+        driver.sendFrameworkMessage(str("%s:  ---> Uploading squashed image to docker" % image_name))
+
+        with open(new_image_tarball_path, "r") as fh:
+            self.docker.remove_image(head_image_id, force=True)
+            self.docker.load_image(fh)
+
+        return head_image_id

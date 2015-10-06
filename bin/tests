@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+cd $(dirname $(dirname "$0"))
+
+bin/setup
+source bin/env/bin/activate
+
+py.test portainer/

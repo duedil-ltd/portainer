@@ -13,6 +13,7 @@ message BuildTask {
     optional string context = 2;
     optional string dockerfile = 6; // Optional string representation of the Dockerfile to build
     optional bool stream = 5; // Should we stream the build output?
+    optional bool squash = 8 [default=false]; // Squash the image into a single layer?
 }
 
 /**

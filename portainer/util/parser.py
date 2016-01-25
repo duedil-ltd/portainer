@@ -66,7 +66,8 @@ class Dockerfile(object):
     INTERNAL = ["REGISTRY", "REPOSITORY", "BUILD_CPU", "BUILD_MEM"]
 
     def __init__(self, lines=[], registry=None):
-        self.instructions = []
+        self.instructions = []  # Instructions that are supported in the standard Dockerfile
+        self.internal_instructions = []  # Custom instructions used by Portainer
         self.registry = registry
 
         self.build_cpu = None
@@ -91,13 +92,15 @@ class Dockerfile(object):
                 parts[:0] = [self.registry]
                 arguments = ["/".join(parts)]
 
-        self.instructions.append((command, arguments))
-
-        if command.lower() in self.INTERNAL:
+        if command.upper() in self.INTERNAL:
+            self.internal_instructions.append((command, arguments))
             setattr(self, command.lower(), arguments)
+        else:
+            self.instructions.append((command, arguments))
 
     def get(self, filter_command, default=[]):
-        for command, instruction in self.instructions:
+        instructions = chain(self.instructions, self.internal_instructions)
+        for command, instruction in instructions:
             if command == filter_command:
                 yield instruction
                 break

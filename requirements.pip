@@ -7,5 +7,3 @@ boto==2.27.0
 progressbar==2.2
 pywebhdfs==0.2.4
 mesos.interface==0.21.1
-mock==1.3.0
-pytest==2.8.0

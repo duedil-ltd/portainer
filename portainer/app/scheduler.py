@@ -41,7 +41,7 @@ class Scheduler(mesos.interface.Scheduler):
     def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
                  pull_registry=None, docker_host=None, container_image=None,
-                 insecure_registries=False, squash_layers=True):
+                 insecure_registries=False):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -55,7 +55,6 @@ class Scheduler(mesos.interface.Scheduler):
         self.docker_host = docker_host
         self.container_image = container_image
         self.insecure_registries = insecure_registries
-        self.squash_layers = squash_layers
 
         self.queued_tasks = []
         for path, tags in tasks:
@@ -263,7 +262,6 @@ class Scheduler(mesos.interface.Scheduler):
         # Define the build that's required
         build_task = portainer_pb2.BuildTask()
         build_task.stream = self.stream
-        build_task.squash = self.squash_layers
 
         # Create a custom docker context if there are local sources
         staging_context_path = None

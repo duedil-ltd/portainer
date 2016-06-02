@@ -38,7 +38,6 @@ See below for more documentation on how to use the Vagrant virtual machine.
 - Full support for all `Dockerfile` commands, including local sources (e.g `ADD ./src`)
 - Docker build logs are streamed from the Mesos agent for easy debugging and monitoring
 - Support for the `.dockerignore` file
-- Automatically squashing built layers into a single one (`--squash`)
 
 #### Notes
 

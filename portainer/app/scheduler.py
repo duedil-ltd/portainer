@@ -382,7 +382,7 @@ class Scheduler(mesos.interface.Scheduler):
 
         # Define the mesos task
         task = mesos_pb2.TaskInfo()
-        task.name = "%s/%s" % (":".join(build_task.image.registry.hostname), build_task.image.repository)
+        task.name = "%s/%s" % (":".join([build_task.image.registry.hostname, str(build_task.image.registry.port)]), build_task.image.repository)
         task.task_id.value = build_task.task_id
         task.slave_id.value = offer.slave_id.value
 

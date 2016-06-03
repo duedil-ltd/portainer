@@ -72,7 +72,6 @@ def main(args):
         args.container_image = None
 
     scheduler = Scheduler(
-        tasks=[(d, args.tags) for d in args.dockerfile],
         executor_uri=args.executor,
         cpu_limit=args.build_cpu,
         mem_limit=args.build_mem,
@@ -95,6 +94,11 @@ def main(args):
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)
     thread.start()
+
+    # Enqueue all of the dockerfiles we've been given via the command line to
+    # be built
+    for d in args.dockerfile:
+        scheduler.enqueue_build(d, args.tags)
 
     # Wait here until the tasks are done
     while thread.isAlive():

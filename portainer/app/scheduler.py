@@ -38,7 +38,7 @@ class StagingSystemRequiredException(Exception):
 class Scheduler(mesos.interface.Scheduler):
     """Mesos scheduler that is responsible for launching the builder tasks."""
 
-    def __init__(self, tasks, executor_uri, cpu_limit, mem_limit, push_registry,
+    def __init__(self, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
                  pull_registry=None, docker_host=None, container_image=None,
                  insecure_registries=False):
@@ -56,18 +56,15 @@ class Scheduler(mesos.interface.Scheduler):
         self.container_image = container_image
         self.insecure_registries = insecure_registries
 
-        self.queued_tasks = []
-        for path, tags in tasks:
-            dockerfile = parse_dockerfile(path, registry=pull_registry)
-            self.queued_tasks.append((path, dockerfile, tags))
-
-        self.pending = len(self.queued_tasks)
+        self.pending = 0
         self.running = 0
         self.finished = 0
         self.failed = 0
+        self.queued_tasks = []
         self.task_ids = {}
 
         self._processing_offers = threading.Lock()
+        self._processing_queue = threading.Lock()
 
         # Ensure the staging directory exists
         self.filesystem = None
@@ -87,6 +84,110 @@ class Scheduler(mesos.interface.Scheduler):
 
         self.cleanup = TaskCleanupThread(self.filesystem)
         self.cleanup.start()
+
+    def enqueue_build(self, path, tags):
+        """Enqueue a dockerfile (with a set of associated tags) to build.
+        """
+
+        task_id = str(uuid.uuid1())
+
+        logger.info("Queuing build for %s for %s", task_id, path)
+
+        build_task = portainer_pb2.BuildTask()
+        build_task.stream = self.stream
+        build_task.task_id = task_id
+
+        dockerfile = parse_dockerfile(path, registry=self.pull_registry)
+
+        # Prepare a custom build context if there are any local sources, since they
+        # will need to be shipped to the cluster
+        if dockerfile.has_local_sources:
+            working_dir = os.path.abspath(os.path.dirname(path))
+
+            # Generate the dockerfile build context
+            _, context_path = tempfile.mkstemp()
+            context = open(context_path, "w+b")
+
+            logger.debug("Writing context tar to %s", context_path)
+            context_size = self._make_build_context(context, working_dir, dockerfile)
+
+            # Put together the staging directory
+            staging_dir = os.path.join("staging", task_id)
+            context_filename = "docker_context.tar.gz"
+
+            staging_context_path = os.path.join(staging_dir, context_filename)
+
+            # Create the directory
+            logger.debug("Task staging directory %s", staging_dir)
+            self.filesystem.makedir(staging_dir, recursive=True)
+
+            # Upload the build context (+ fancy progress bar)
+            logger.info("Uploading context (%d bytes)", context_size)
+            pbar = progressbar.ProgressBar(maxval=context_size, term_width=100)
+
+            # Define a custom error handler for the async upload
+            caught_exception = threading.Event()
+
+            def handle_exception(e):
+                (_, _, tb) = sys.exc_info()
+                logger.error("Caught exception uploading the context: %s" % e.message)
+                logger.error(traceback.format_exc(tb))
+                caught_exception.set()
+
+            event = self.filesystem.setcontents_async(
+                path=staging_context_path,
+                data=context,
+                progress_callback=pbar.update,
+                finished_callback=pbar.finish,
+                error_callback=handle_exception
+            )
+
+            # Hold up, let's wait until the upload finishes
+            event.wait()
+
+            # Close and clear up the tmp context
+            logger.debug("Cleaning up local context %s", context_path)
+            context.close()
+            os.unlink(context_path)
+
+            # Check to see if we caught any exceptions while uploading the context
+            if caught_exception.is_set():
+                raise TaskContextException("Exception raised while uploading context")
+
+            build_task.context = context_filename
+            build_task.context_url = os.path.join(self.staging_uri, staging_context_path)
+        else:
+            build_task.dockerfile = dockerfile.build()
+
+        # Configure properties on the docker daemon
+        if self.docker_host:
+            build_task.daemon.docker_host = self.docker_host
+        if self.insecure_registries:
+            for registry in [self.pull_registry, self.push_registry]:
+                if registry:
+                    build_task.daemon.insecure_registries.append(registry)
+
+        # Pull out the repository from the dockerfile
+        try:
+            build_task.image.repository = dockerfile.get("REPOSITORY", [self.repository]).next()[0]
+        except (StopIteration, IndexError):
+            raise ValueError("No REPOSITORY given for %s", path)
+
+        # Pull out the registry from the dockerfile
+        try:
+            registry = self.push_registry.split(":")
+            build_task.image.registry.hostname = registry[0]
+            if len(registry) > 1:
+                build_task.image.registry.port = int(registry[1])
+        except ValueError:
+            raise ValueError("Failed to parse REGISTRY in %s", path)
+
+        # Add any tags
+        build_task.image.tag.extend(tags)
+
+        with self._processing_queue:
+            self.pending += 1
+            self.queued_tasks.append((dockerfile, build_task))
 
     def registered(self, driver, frameworkId, masterInfo):
         host = masterInfo.hostname or masterInfo.ip
@@ -142,65 +243,51 @@ class Scheduler(mesos.interface.Scheduler):
                     logger.debug("Received offer for cpus:%f mem:%d role:%s", offer_cpu, offer_mem, offer_role)
 
                     # Look for a task in the queue that fits the bill
-                    for idx, (path, dockerfile, tags) in enumerate(self.queued_tasks):
-                        cpu = float(dockerfile.get("BUILD_CPU", [self.cpu]).next()[0])
-                        mem = int(dockerfile.get("BUILD_MEM", [self.mem]).next()[0])
+                    with self._processing_queue:
+                        for idx, (dockerfile, build_task) in enumerate(self.queued_tasks):
+                            cpu = float(dockerfile.get("BUILD_CPU", [self.cpu]).next()[0])
+                            mem = int(dockerfile.get("BUILD_MEM", [self.mem]).next()[0])
 
-                        if cpu <= offer_cpu and mem <= offer_mem:
-                            self.queued_tasks[idx] = None  # Remove the task from the queue
-                            self.pending -= 1
-                            self.running += 1
-                            tasks_to_launch.append((offer, path, dockerfile,
-                                                    tags, cpu, mem, offer_role))
-                            # TODO: No support for multiple tasks per offer yet
-                            break
-                    else:
-                        logger.debug("Ignoring offer %r", offer)
-                        driver.declineOffer(offer.id)
+                            if cpu <= offer_cpu and mem <= offer_mem:
+                                # Remove the task from the queue, we set this to None
+                                # to avoid changing the size of the list while looping
+                                self.queued_tasks[idx] = None
+                                self.pending -= 1
+                                self.running += 1
+                                tasks_to_launch.append((offer, offer_role, cpu, mem, dockerfile, build_task))
+                                logger.info("Launching build task %s with offer from %s", build_task.task_id, offer.hostname)
+                                break  # TODO: Don't currently support launching multiple tasks in a single offer
+                        else:
+                            logger.debug("Ignoring offer %r", offer)
+                            driver.declineOffer(offer.id)
 
-                    # Remove all of the tasks that are about to be launched
-                    self.queued_tasks = filter(None, self.queued_tasks)
+                        # Remove all of the tasks that are about to be launched
+                        self.queued_tasks = filter(None, self.queued_tasks)
 
         # Launch the build tasks on the mesos cluster
         # We do this outside of the _processing_offers lock because if there are
         # any tasks, we've already taken them off the queue to be launched.
-        for offer, path, dockerfile, tags, cpu, mem, role in tasks_to_launch:
-            # Generate a task ID
-            task_id = str(uuid.uuid1())
-
+        for offer, role, cpu, mem, dockerfile, build_task in tasks_to_launch:
             try:
                 tasks = [self._prepare_task(
                     driver=driver,
-                    task_id=task_id,
-                    path=path,
                     dockerfile=dockerfile,
-                    tags=tags,
+                    build_task=build_task,
                     offer=offer,
                     cpu=cpu,
                     mem=mem,
                     role=role
                 )]
-            except TaskContextException as e:
-                logger.error("Caught exception: %s", e.message)
-                self.failed += 1
-                self.running -= 1
-                tasks = []
-            except StagingSystemRequiredException as e:
+            except Exception, e:
                 logger.error("Caught exception: %s", e.message)
                 self.failed += 1
                 self.running -= 1
                 tasks = []
 
-            if not tasks:
-                logger.error("Task %s failed to launch", task_id)
-
-                # If there's no pending tasks or any tasks running, stop
-                # the driver.
-                if (self.pending + self.running) == 0:
-                    driver.stop()
-            else:
-                logger.info("Launching %d tasks", len(tasks))
+            if tasks:
                 driver.launchTasks([offer.id], tasks)
+            else:
+                driver.declineOffer(offer.id)
 
     def status_update(self, driver, update):
         """Called when a status update is received from the mesos cluster."""
@@ -253,105 +340,12 @@ class Scheduler(mesos.interface.Scheduler):
         else:
             logger.info("\t%s", message)
 
-    def _prepare_task(self, driver, task_id, path, dockerfile, tags, offer,
-                      cpu, mem, role):
-        """Prepare a given dockerfile build task atop the given mesos offer."""
-
-        logger.info("Preparing task %s to build %s", task_id, path)
-
-        # Define the build that's required
-        build_task = portainer_pb2.BuildTask()
-        build_task.stream = self.stream
-
-        # Create a custom docker context if there are local sources
-        staging_context_path = None
-        if dockerfile.has_local_sources:
-            working_dir = os.path.abspath(os.path.dirname(path))
-
-            # Generate the dockerfile build context
-            _, context_path = tempfile.mkstemp()
-            context = open(context_path, "w+b")
-
-            logger.debug("Writing context tar to %s", context_path)
-            context_size = self._make_build_context(context, working_dir, dockerfile)
-
-            # Put together the staging directory
-            staging_dir = os.path.join("staging", task_id)
-            context_filename = "docker_context.tar.gz"
-
-            staging_context_path = os.path.join(staging_dir, context_filename)
-
-            # Create the directory
-            logger.debug("Task staging directory %s", staging_dir)
-            self.filesystem.makedir(staging_dir, recursive=True)
-
-            # Upload the build context (+ fancy progress bar)
-            logger.info("Uploading context (%d bytes)", context_size)
-            pbar = progressbar.ProgressBar(maxval=context_size, term_width=100)
-
-            # Define a custom error handler for the async upload
-            caught_exception = threading.Event()
-
-            def handle_exception(e):
-                (_, _, tb) = sys.exc_info()
-                logger.error("Caught exception uploading the context: %s" % e.message)
-                logger.error(traceback.format_exc(tb))
-                caught_exception.set()
-
-            event = self.filesystem.setcontents_async(
-                path=staging_context_path,
-                data=context,
-                progress_callback=pbar.update,
-                finished_callback=pbar.finish,
-                error_callback=handle_exception
-            )
-
-            # Hold up, let's wait until the upload finishes
-            event.wait()
-
-            # Close and clear up the tmp context
-            logger.debug("Cleaning up local context %s", context_path)
-            context.close()
-            os.unlink(context_path)
-
-            # Check to see if we caught any exceptions while uploading the context
-            if caught_exception.is_set():
-                raise TaskContextException("Exception raised while uploading context")
-
-            build_task.context = context_filename
-        else:
-            build_task.dockerfile = dockerfile.build()
-
-        # Configure properties on the docker daemon
-        if self.docker_host:
-            build_task.daemon.docker_host = self.docker_host
-        if self.insecure_registries:
-            for registry in [self.pull_registry, self.push_registry]:
-                if registry:
-                    build_task.daemon.insecure_registries.append(registry)
-
-        # Pull out the repository from the dockerfile
-        try:
-            build_task.image.repository = dockerfile.get("REPOSITORY", [self.repository]).next()[0]
-        except (StopIteration, IndexError):
-            raise ValueError("No REPOSITORY given for %s", path)
-
-        # Pull out the registry from the dockerfile
-        try:
-            registry = self.push_registry.split(":")
-            build_task.image.registry.hostname = registry[0]
-            if len(registry) > 1:
-                build_task.image.registry.port = int(registry[1])
-        except ValueError:
-            raise ValueError("Failed to parse REGISTRY in %s", path)
-
-        # Add any tags
-        build_task.image.tag.extend(tags)
+    def _prepare_task(self, driver, dockerfile, build_task, offer, cpu, mem, role):
 
         # Define the mesos task
         task = mesos_pb2.TaskInfo()
-        task.name = "%s/%s" % (":".join(registry), build_task.image.repository)
-        task.task_id.value = task_id
+        task.name = "%s/%s" % (":".join(build_task.image.registry.hostname), build_task.image.repository)
+        task.task_id.value = build_task.task_id
         task.slave_id.value = offer.slave_id.value
 
         # Create the executor
@@ -359,7 +353,7 @@ class Scheduler(mesos.interface.Scheduler):
         if self.verbose:
             args.append("--verbose")
 
-        task.executor.executor_id.value = task_id
+        task.executor.executor_id.value = build_task.task_id
         task.executor.command.value = "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor" % (
             os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
         )
@@ -376,10 +370,10 @@ class Scheduler(mesos.interface.Scheduler):
         portainer_executor = task.executor.command.uris.add()
         portainer_executor.value = self.executor_uri
 
-        if staging_context_path:
+        if build_task.context:
             # Add the docker context
             uri = task.executor.command.uris.add()
-            uri.value = os.path.join(self.staging_uri, staging_context_path)
+            uri.value = build_task.context_url
             uri.extract = False
 
         task.data = build_task.SerializeToString()
@@ -398,10 +392,7 @@ class Scheduler(mesos.interface.Scheduler):
         mem_resource.role = role
         mem_resource.scalar.value = mem
 
-        self.task_ids[task_id] = build_task
-
-        logger.info("Prepared task %s to build %s", task_id, path)
-        logger.debug("%s", build_task)
+        self.task_ids[build_task.task_id] = build_task
 
         return task
 

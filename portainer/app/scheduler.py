@@ -14,6 +14,7 @@ import threading
 import traceback
 import uuid
 
+from collections import defaultdict
 from fnmatch import fnmatch
 from functools import partial
 from fs.opener import opener
@@ -41,7 +42,7 @@ class Scheduler(mesos.interface.Scheduler):
     def __init__(self, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
                  pull_registry=None, docker_host=None, container_image=None,
-                 insecure_registries=False):
+                 insecure_registries=False, max_retries=3):
 
         self.executor_uri = executor_uri
         self.cpu = float(cpu_limit)
@@ -55,13 +56,17 @@ class Scheduler(mesos.interface.Scheduler):
         self.docker_host = docker_host
         self.container_image = container_image
         self.insecure_registries = insecure_registries
+        self.max_retries = max_retries
 
         self.pending = 0
         self.running = 0
         self.finished = 0
         self.failed = 0
         self.queued_tasks = []
-        self.task_ids = {}
+        self.task_status = defaultdict(lambda: None)
+        self.task_history = {}
+        self.task_retries = defaultdict(int)
+        self.blacklist = set()
 
         self._processing_offers = threading.Lock()
         self._processing_queue = threading.Lock()
@@ -244,6 +249,11 @@ class Scheduler(mesos.interface.Scheduler):
 
                     # Look for a task in the queue that fits the bill
                     with self._processing_queue:
+                        if offer.slave_id.value in self.blacklist:
+                            logger.info("Ignoring offer from blacklisted slave %s", offer.slave_id.value)
+                            driver.declineOffer(offer.id)
+                            continue
+
                         for idx, (dockerfile, build_task) in enumerate(self.queued_tasks):
                             cpu = float(dockerfile.get("BUILD_CPU", [self.cpu]).next()[0])
                             mem = int(dockerfile.get("BUILD_MEM", [self.mem]).next()[0])
@@ -296,8 +306,9 @@ class Scheduler(mesos.interface.Scheduler):
         failed = False
         task_id = update.task_id.value
 
-        if update.task_id.value not in self.task_ids:
+        if update.task_id.value not in self.task_history:
             logger.error("Task update for unknown task! %s", task_id)
+            return
 
         if update.state == mesos_pb2.TASK_STARTING:
             logger.info("Task update %s : STARTING", task_id)
@@ -318,16 +329,25 @@ class Scheduler(mesos.interface.Scheduler):
             logger.info("Task update %s : LOST", task_id)
             failed = True
 
+        # Update the last known status of the task
+        last_known_state = self.task_status[task_id]
+        self.task_status[task_id] = update.state
+
         if finished:
+            self.cleanup.schedule_cleanup(task_id)
+
             self.running -= 1
             self.finished += 1
         elif failed:
             self.running -= 1
             self.failed += 1
 
-        # Schedule cleanup for this task now that it's terminal
-        if finished or failed:
-            self.cleanup.schedule_cleanup(task_id)
+            # Re-queue the task if it hasn't started RUNNING yet
+            if last_known_state in {None, mesos_pb2.TASK_STARTING, mesos_pb2.TASK_STAGING} and \
+               self.task_retries[task_id] < self.max_retries:
+                    self._reschedule_task(task_id, blacklist_slave=update.slave_id.value)
+            else:
+                self.cleanup.schedule_cleanup(task_id)
 
         # If there are no tasks running, and the queue is empty, we should stop
         if self.running == 0 and self.pending == 0:
@@ -339,6 +359,24 @@ class Scheduler(mesos.interface.Scheduler):
             logger.debug("\t%s", message)
         else:
             logger.info("\t%s", message)
+
+    def _reschedule_task(self, task_id, blacklist_slave=None):
+        if task_id not in self.task_history:
+            logger.error("Cannot re-schedule unknown task %s", task_id)
+            return
+
+        with self._processing_queue:
+            del self.task_status[task_id]
+
+            self.pending += 1
+            self.task_retries[task_id] += 1
+
+            if blacklist_slave:
+                self.blacklist.add(blacklist_slave)
+
+            self.queued_tasks.append(self.task_history[task_id])
+            logger.info("Re-scheduling task [%d] %s, excluding slave %s",
+                        self.task_retries[task_id], task_id, blacklist_slave)
 
     def _prepare_task(self, driver, dockerfile, build_task, offer, cpu, mem, role):
 
@@ -392,7 +430,7 @@ class Scheduler(mesos.interface.Scheduler):
         mem_resource.role = role
         mem_resource.scalar.value = mem
 
-        self.task_ids[build_task.task_id] = build_task
+        self.task_history[build_task.task_id] = (dockerfile, build_task)
 
         return task
 

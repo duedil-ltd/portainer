@@ -42,6 +42,8 @@ def args(parser):
                        help="Docker image to run the portainer executor in")
     group.add_argument("--insecure", default=False, action="store_true",
                        help="Enable pulling/pushing of images with insecure registries")
+    group.add_argument("--retries", default=3,
+                       help="Number of attempts at retrying the build if it fails (before the build begins)")
 
     # Arguments for the staging filesystem
     group = parser.add_argument_group("fs")
@@ -83,7 +85,8 @@ def main(args):
         stream=args.stream,
         docker_host=args.docker_host,
         verbose=args.verbose,
-        insecure_registries=args.insecure
+        insecure_registries=args.insecure,
+        max_retries=args.retries
     )
 
     driver = pesos.scheduler.PesosSchedulerDriver(

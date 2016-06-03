@@ -7,10 +7,15 @@ package portainer;
  *   context: Path to the build context tar file (relative to the task sandbox)
  */
 message BuildTask {
+    optional string task_id = 8; // This is optional for backwards compat.
     required DockerImage image = 1;
     optional DockerDaemon daemon = 7;
 
-    optional string context = 2;
+    // Note: I'd rather have put this within a nested structure (maybe a DockerContext)
+    // message but this makes for easier backwards compat.
+    optional string context = 2; // Filename of the custom build context
+    optional string context_url = 9; // Fully qualified URL to download the context
+
     optional string dockerfile = 6; // Optional string representation of the Dockerfile to build
     optional bool stream = 5; // Should we stream the build output?
 }

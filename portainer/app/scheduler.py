@@ -340,13 +340,13 @@ class Scheduler(mesos.interface.Scheduler):
             self.finished += 1
         elif failed:
             self.running -= 1
-            self.failed += 1
 
             # Re-queue the task if it hasn't started RUNNING yet
             if last_known_state in {None, mesos_pb2.TASK_STARTING, mesos_pb2.TASK_STAGING} and \
                self.task_retries[task_id] < self.max_retries:
                     self._reschedule_task(task_id, blacklist_slave=update.slave_id.value)
             else:
+                self.failed += 1
                 self.cleanup.schedule_cleanup(task_id)
 
         # If there are no tasks running, and the queue is empty, we should stop

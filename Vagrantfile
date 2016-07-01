@@ -5,42 +5,35 @@
 $docker_setup = <<SCRIPT
 set -e
 
-# Setup
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF
+# Install Docker
+curl -sSL https://get.docker.com/ | sh
+sudo usermod -aG docker vagrant
+
+# Set up the docker registry
+sudo mkdir -p /registry
+sudo docker create -p 5000:5000 -v /registry:/tmp/registry-dev --name=registry registry:0.9.1
+(sudo docker start registry || true)
+
+# Setup Mesos
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E56151BF
 DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
 CODENAME=$(lsb_release -cs)
 
-# Add the repository
-echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" | \
+echo "deb http://repos.mesosphere.com/${DISTRO} ${CODENAME} main" | \
   sudo tee /etc/apt/sources.list.d/mesosphere.list
 sudo apt-get -y update
 sudo apt-get -y install mesos
+
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-master/ip"
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-slave/ip"
+sudo bash -c "echo 192.168.33.50 > /etc/mesos-slave/hostname"
 sudo bash -c "echo docker,mesos > /etc/mesos-slave/containerizers"
-sudo bash -c "echo /usr/bin/docker-1.7.0 > /etc/mesos-slave/docker"
 
 # Start a bunch of services
 sudo service zookeeper restart
 sleep 5
 (sudo service mesos-master stop || true)
 (sudo service mesos-slave stop || true)
-
-# Install Docker
-sudo bash -c 'echo "deb http://http.debian.net/debian wheezy-backports main" > /etc/apt/sources.list.d/backports.list'
-sudo apt-get install -y linux-image-amd64
-curl -sSL https://get.docker.com/ | sh
-sudo usermod -a -G docker vagrant
-
-# Download a specific docker binary
-# TODO: Skip the above?
-sudo bash -c "curl -0 https://get.docker.com/builds/Linux/x86_64/docker-1.7.0 > /usr/bin/docker-1.7.0"
-sudo chmod +x /usr/bin/docker-1.7.0
-
-# Set up the docker registry
-sudo mkdir -p /registry
-sudo docker create -p 5000:5000 -v /registry:/tmp/registry-dev --name=registry registry:0.9.1
-(sudo docker start registry || true)
 
 # Start mesos
 sudo service mesos-master start
@@ -55,7 +48,7 @@ SCRIPT
 Vagrant.configure("2") do |config|
 
   # Use the same base box as vagrant-web
-  config.vm.box = "debian-73-x64-virtualbox-nocm"
+  config.vm.box = "ubuntu/trusty64"
 
   config.vm.synced_folder "./", "/opt/portainer"
   config.vm.network :private_network, ip: "192.168.33.50"
@@ -67,5 +60,5 @@ Vagrant.configure("2") do |config|
   end
 
   # Install all the things!
-  config.vm.provision "shell", inline: $docker_setup
+  # config.vm.provision "shell", inline: $docker_setup
 end

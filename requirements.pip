@@ -1,4 +1,4 @@
-git+git://github.com/tarnfeld/pesos.git@d489a976cd9aaf9012e03888d7bfb44b903977c6#egg=pesos
+git+git://github.com/oli-hall/pesos.git@05adcb0621b51e2734322b7d8e4bc4104ceaef35#egg=pesos
 git+git://github.com/duedil-ltd/pyfilesystem.git@2b58f1359f50ecaf9ffea1e9ab3a88afb9f84d5e#egg=fs
 trollius==0.4
 protobuf>=2.6.1,<2.7

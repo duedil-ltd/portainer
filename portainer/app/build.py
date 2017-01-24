@@ -61,7 +61,7 @@ def main(args):
 
     # Launch the mesos framework
     framework = mesos_pb2.FrameworkInfo()
-    framework.user = getpass.getuser()
+    framework.user = 'root' #getpass.getuser()
     framework.name = "portainer"
 
     if args.framework_role:

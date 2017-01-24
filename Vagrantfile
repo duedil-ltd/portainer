@@ -66,6 +66,9 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--cpus", "2"]
   end
 
+  # ensure VM clock stays in sync with correct time zone
+  config.vm.provision :shell, :inline => "sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/Europe/London /etc/localtime", run: "always"
+
   # Install all the things!
   config.vm.provision "shell", inline: $docker_setup
 end

@@ -1,5 +1,5 @@
 git+git://github.com/tarnfeld/pesos.git@d489a976cd9aaf9012e03888d7bfb44b903977c6#egg=pesos
-git+git://github.com/duedil-ltd/pyfilesystem.git@f952ec334e074d56f187dd61a3932d7b884dbdde#egg=fs
+git+git://github.com/duedil-ltd/pyfilesystem.git@2b58f1359f50ecaf9ffea1e9ab3a88afb9f84d5e#egg=fs
 trollius==0.4
 protobuf>=2.6.1,<2.7
 docker-py==0.4.0

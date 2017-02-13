@@ -3,14 +3,14 @@ sent from the portainer scheduler) as "pid one" of the task. Responsible for
 invoking the docker daemon, then running `docker build` for the task's staged
 context file, and communicating with mesos throughout"""
 
+import base64
 import docker
 import functools
 import io
 import json
 import logging
-import mesos.interface
 import os
-import pesos.executor
+import pymesos
 import re
 import signal
 import subprocess
@@ -18,19 +18,15 @@ import threading
 import time
 import traceback
 
-from pesos.vendor.mesos import mesos_pb2
-
 from portainer.app import subcommand
 from portainer.proto import portainer_pb2
-
 
 logger = logging.getLogger("portainer.executor")
 
 
 @subcommand("build-executor")
 def main(args):
-
-    driver = pesos.executor.PesosExecutorDriver(Executor())
+    driver = pymesos.MesosExecutorDriver(Executor())
 
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)
@@ -40,12 +36,7 @@ def main(args):
         time.sleep(0.5)
 
 
-class Executor(mesos.interface.Executor):
-
-    TASK_STARTING = mesos_pb2.TASK_STARTING
-    TASK_RUNNING = mesos_pb2.TASK_RUNNING
-    TASK_FINISHED = mesos_pb2.TASK_FINISHED
-    TASK_FAILED = mesos_pb2.TASK_FAILED
+class Executor(pymesos.Executor):
 
     def __init__(self):
         self.build_task = None
@@ -54,15 +45,14 @@ class Executor(mesos.interface.Executor):
         self.docker_daemon_up = False
 
     def registered(self, driver, executorInfo, frameworkInfo, slaveInfo):
-
         logger.info("Setting up environment for building containers")
 
         # Parse the build task object
         try:
             build_task = portainer_pb2.BuildTask()
-            build_task.ParseFromString(executorInfo.data)
+            build_task.ParseFromString(base64.b64decode(executorInfo['data']))
         except Exception:
-            logger.error("Failed to parse BuildTask in ExecutorInfo.data")
+            logger.error("Failed to parse BuildTask in ExecutorInfo['data']")
             raise
 
         self.build_task = build_task
@@ -103,21 +93,20 @@ class Executor(mesos.interface.Executor):
             self.docker = docker.Client(build_task.daemon.docker_host)
             self.docker_daemon_up = True
 
+    def reregistered(self, driver, slaveInfo):
+        logger.info("Re-registered to master! Ahh!")
+
     def disconnected(self, driver):
         logger.info("Disconnected from master! Ahh!")
 
-    def reregistered(self, driver, slaveInfo):
-        logger.info("Re-registered from the master! Ahh!")
-
-    def launchTask(self, driver, taskInfo):
-
-        logger.info("Launched task %s", taskInfo.task_id.value)
+    def launchTask(self, driver, task):
+        logger.info("Launched task %s", task['task_id']['value'])
 
         # Spawn another thread to run the task, freeing up the executor
         thread = threading.Thread(target=functools.partial(
             self._build_image,
             driver,
-            taskInfo,
+            task,
             self.build_task
         ))
 
@@ -135,6 +124,130 @@ class Executor(mesos.interface.Executor):
                 logger.error(e)
         else:
             logger.warning("Unable to locate docker pidfile")
+
+    def _build_image(self, driver, taskInfo, buildTask):
+        """Build an image for the given buildTask."""
+
+        # Tell mesos that we're starting the task
+        driver.sendStatusUpdate({
+            'task_id': taskInfo['task_id'],
+            'state': 'TASK_STARTING'
+        })
+
+        logger.info("Waiting for docker daemon to be available")
+
+        # Wait for the docker daemon to be ready (up to 30 seconds)
+        timeout = 30
+        while timeout > 1 and not self.docker_daemon_up:
+            timeout -= 1
+            time.sleep(1)
+
+        try:
+            if not self.docker_daemon_up:
+                raise Exception("Timed out waiting for docker daemon")
+
+            # Now that docker is up, let's go and do stuff
+            driver.sendStatusUpdate({
+                'task_id': taskInfo['task_id'],
+                'state': 'TASK_RUNNING'
+            })
+
+            if not buildTask:
+                raise Exception("Failed to decode the BuildTask protobuf data")
+
+            if not buildTask.context and not buildTask.dockerfile:
+                raise Exception("Either a build context or dockerfile is required")
+
+            registry_url = None
+            if buildTask.image.HasField("registry"):
+                registry_url = buildTask.image.registry.hostname
+                if buildTask.image.registry.HasField("port"):
+                    registry_url += ":%d" % buildTask.image.registry.port
+                registry_url += "/"
+
+            if not registry_url:
+                raise Exception("No registry URL provided")
+
+            image_name = registry_url + buildTask.image.repository
+            logger.info("Building image %s", image_name)
+
+            if buildTask.dockerfile:
+                build_request = self.docker.build(
+                    fileobj=io.StringIO(buildTask.dockerfile),
+                    stream=True
+                )
+
+                for message, is_stream in self._wrap_docker_stream(build_request):
+                    if not is_stream or (is_stream and buildTask.stream):
+                        driver.sendFrameworkMessage(
+                            base64.b64encode("%s: %s" % (image_name, message))
+                        )
+            else:
+                sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
+                context_path = os.path.join(sandbox_dir, buildTask.context)
+
+                if not os.path.exists(context_path):
+                    raise Exception("Context %s does not exist" % (context_path))
+
+                with open(context_path, "r") as context:
+                    build_request = self.docker.build(
+                        fileobj=context,
+                        custom_context=True,
+                        encoding="gzip",
+                        stream=True
+                    )
+
+                    for message, is_stream in self._wrap_docker_stream(build_request):
+                        if not is_stream or (is_stream and buildTask.stream):
+                            driver.sendFrameworkMessage(
+                                base64.b64encode("%s: %s" % (image_name, message))
+                            )
+
+            # Extract the newly created image ID
+            match = re.search(r'built (.*)$', message)
+            if not match:
+                raise Exception("Failed to match image ID from %r" % message)
+            image_id = match.group(1)
+
+            # Tag the image with all the required tags
+            tags = buildTask.image.tag or ["latest"]
+            driver.sendFrameworkMessage(base64.b64encode("%s: Tagging image %s" % (image_name, image_id)))
+            for tag in tags:
+                try:
+                    self.docker.tag(
+                        image=image_id,
+                        repository=image_name,
+                        tag=tag,
+                        force=True
+                    )
+                    driver.sendFrameworkMessage(base64.b64encode("%s:    -> %s" % (image_name, tag)))
+                except Exception, e:
+                    raise e
+
+            # Push the image to the registry
+            driver.sendFrameworkMessage(base64.b64encode("%s: Pushing image" % image_name))
+            push_request = self.docker.push(image_name, stream=True)
+            for message, is_stream in self._wrap_docker_stream(push_request):
+                if not is_stream or (is_stream and buildTask.stream):
+                    driver.sendFrameworkMessage(
+                        base64.b64encode("%s: %s" % (image_name, message))
+                    )
+
+            driver.sendStatusUpdate({
+                'task_id': taskInfo['task_id'],
+                'state': 'TASK_FINISHED'
+            })
+        except Exception, e:
+            logger.error("Caught exception building image: %s", e)
+            driver.sendStatusUpdate({
+                'task_id': taskInfo['task_id'],
+                'state': 'TASK_FAILED',
+                'message': str(e),
+                'data': base64.b64encode(traceback.format_exc())
+            })
+
+            # Re-raise the exception for logging purposes and to terminate the thread
+            raise
 
     def _wrap_docker_stream(self, stream):
         """Wrapper to parse the different types of messages from the
@@ -170,127 +283,3 @@ class Executor(mesos.interface.Executor):
 
                 if friendly_message is not None:
                     yield friendly_message, is_stream
-
-    def _build_image(self, driver, taskInfo, buildTask):
-        """Build an image for the given buildTask."""
-
-        # Tell mesos that we're starting the task
-        driver.sendStatusUpdate(mesos_pb2.TaskStatus(
-            task_id=taskInfo.task_id,
-            state=self.TASK_STARTING
-        ))
-
-        logger.info("Waiting for docker daemon to be available")
-
-        # Wait for the docker daemon to be ready (up to 30 seconds)
-        timeout = 30
-        while timeout > 1 and not self.docker_daemon_up:
-            timeout -= 1
-            time.sleep(1)
-
-        try:
-            if not self.docker_daemon_up:
-                raise Exception("Timed out waiting for docker daemon")
-
-            # Now that docker is up, let's go and do stuff
-            driver.sendStatusUpdate(mesos_pb2.TaskStatus(
-                task_id=taskInfo.task_id,
-                state=self.TASK_RUNNING
-            ))
-
-            if not buildTask:
-                raise Exception("Failed to decode the BuildTask protobuf data")
-
-            if not buildTask.context and not buildTask.dockerfile:
-                raise Exception("Either a build context or dockerfile is required")
-
-            registry_url = None
-            if buildTask.image.HasField("registry"):
-                registry_url = buildTask.image.registry.hostname
-                if buildTask.image.registry.HasField("port"):
-                    registry_url += ":%d" % buildTask.image.registry.port
-                registry_url += "/"
-
-            if not registry_url:
-                raise Exception("No registry URL provided")
-
-            image_name = registry_url + buildTask.image.repository
-            logger.info("Building image %s", image_name)
-
-            if buildTask.dockerfile:
-                build_request = self.docker.build(
-                    fileobj=io.StringIO(buildTask.dockerfile),
-                    stream=True
-                )
-
-                for message, is_stream in self._wrap_docker_stream(build_request):
-                    if not is_stream or (is_stream and buildTask.stream):
-                        driver.sendFrameworkMessage(
-                            ("%s: %s" % (image_name, message)).encode('unicode-escape')
-                        )
-            else:
-                sandbox_dir = os.environ.get("MESOS_SANDBOX", os.environ["MESOS_DIRECTORY"])
-                context_path = os.path.join(sandbox_dir, buildTask.context)
-
-                if not os.path.exists(context_path):
-                    raise Exception("Context %s does not exist" % (context_path))
-
-                with open(context_path, "r") as context:
-                    build_request = self.docker.build(
-                        fileobj=context,
-                        custom_context=True,
-                        encoding="gzip",
-                        stream=True
-                    )
-
-                    for message, is_stream in self._wrap_docker_stream(build_request):
-                        if not is_stream or (is_stream and buildTask.stream):
-                            driver.sendFrameworkMessage(
-                                ("%s: %s" % (image_name, message)).encode('unicode-escape')
-                            )
-
-            # Extract the newly created image ID
-            match = re.search(r'built (.*)$', message)
-            if not match:
-                raise Exception("Failed to match image ID from %r" % message)
-            image_id = match.group(1)
-
-            # Tag the image with all the required tags
-            tags = buildTask.image.tag or ["latest"]
-            driver.sendFrameworkMessage(str("%s: Tagging image %s" % (image_name, image_id)))
-            for tag in tags:
-                try:
-                    self.docker.tag(
-                        image=image_id,
-                        repository=image_name,
-                        tag=tag,
-                        force=True
-                    )
-                    driver.sendFrameworkMessage(str("%s:    -> %s" % (image_name, tag)))
-                except Exception, e:
-                    raise e
-
-            # Push the image to the registry
-            driver.sendFrameworkMessage(str("%s: Pushing image" % image_name))
-            push_request = self.docker.push(image_name, stream=True)
-            for message, is_stream in self._wrap_docker_stream(push_request):
-                if not is_stream or (is_stream and buildTask.stream):
-                    driver.sendFrameworkMessage(
-                        str("%s: %s" % (image_name, message))
-                    )
-
-            driver.sendStatusUpdate(mesos_pb2.TaskStatus(
-                task_id=taskInfo.task_id,
-                state=self.TASK_FINISHED
-            ))
-        except Exception, e:
-            logger.error("Caught exception building image: %s", e)
-            driver.sendStatusUpdate(mesos_pb2.TaskStatus(
-                task_id=taskInfo.task_id,
-                state=self.TASK_FAILED,
-                message=str(e),
-                data=traceback.format_exc()
-            ))
-
-            # Re-raise the exception for logging purposes and to terminate the thread
-            raise

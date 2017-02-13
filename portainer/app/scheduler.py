@@ -2,25 +2,25 @@
 the task definition; pack up the task context; ship it to the staging area;
 accept the offer and launch the task; and wait for the result"""
 
+import base64
 import logging
 import os
-import mesos.interface
 import progressbar
+import pymesos
 import sys
-import StringIO
 import tarfile
 import tempfile
 import threading
 import traceback
 import uuid
 
-from collections import defaultdict
-from fnmatch import fnmatch
-from functools import partial
-from fs.opener import opener
-from pesos.vendor.mesos import mesos_pb2
-from urlparse import urlparse
 from Queue import Queue
+from collections import defaultdict
+from functools import partial
+from urlparse import urlparse
+
+from fs.opener import opener
+from fnmatch import fnmatch
 
 from portainer.proto import portainer_pb2
 from portainer.util.parser import parse_dockerfile, parse_dockerignore
@@ -36,8 +36,7 @@ class StagingSystemRequiredException(Exception):
     pass
 
 
-class Scheduler(mesos.interface.Scheduler):
-    """Mesos scheduler that is responsible for launching the builder tasks."""
+class Scheduler(pymesos.Scheduler):
 
     def __init__(self, executor_uri, cpu_limit, mem_limit, push_registry,
                  staging_uri, stream=False, verbose=False, repository=None,
@@ -95,7 +94,6 @@ class Scheduler(mesos.interface.Scheduler):
         """
 
         task_id = str(uuid.uuid1())
-
         logger.info("Queuing build for %s for %s", task_id, path)
 
         build_task = portainer_pb2.BuildTask()
@@ -194,246 +192,6 @@ class Scheduler(mesos.interface.Scheduler):
             self.pending += 1
             self.queued_tasks.append((dockerfile, build_task))
 
-    def registered(self, driver, frameworkId, masterInfo):
-        host = masterInfo.hostname or masterInfo.ip
-        master = "http://%s:%s" % (host, masterInfo.port)
-        logger.info("Framework %s registered to %s", frameworkId.value, master)
-
-    def disconnected(self, driver):
-        logger.warning("Framework disconnected from the mesos master")
-
-    def reregistered(self, driver, masterInfo):
-        host = masterInfo.hostname or masterInfo.ip
-        master = "http://%s:%s" % (host, masterInfo.port)
-        logger.info("Framework re-registered to %s", master)
-
-    def error(self, driver, message):
-        logger.error("Framework error: %s", message)
-
-    def resource_offers(self, driver, offers):
-
-        # Spawn another thread to handle offer processing to free up the driver
-        t = threading.Thread(target=partial(
-            self._handle_offers,
-            driver,
-            offers
-        ))
-
-        t.setDaemon(True)
-        t.start()
-
-    def _handle_offers(self, driver, offers):
-
-        # We only want to process offers one set at a time
-        with self._processing_offers:
-            tasks_to_launch = []
-
-            if not self.pending:
-                for offer in offers:
-                    driver.declineOffer(offer.id)
-            else:
-                for offer in offers:
-                    offer_cpu = 0.0
-                    offer_mem = 0
-                    offer_role = None
-
-                    # Extract the important resources from the offer
-                    for resource in offer.resources:
-                        offer_role = resource.role
-                        if resource.name == "cpus":
-                            offer_cpu = float(resource.scalar.value)
-                        if resource.name == "mem":
-                            offer_mem = int(resource.scalar.value)
-
-                    logger.debug("Received offer for cpus:%f mem:%d role:%s", offer_cpu, offer_mem, offer_role)
-
-                    # Look for a task in the queue that fits the bill
-                    with self._processing_queue:
-                        if offer.slave_id.value in self.blacklist:
-                            logger.info("Ignoring offer from blacklisted slave %s", offer.slave_id.value)
-                            driver.declineOffer(offer.id)
-                            continue
-
-                        for idx, (dockerfile, build_task) in enumerate(self.queued_tasks):
-                            cpu = float(dockerfile.get("BUILD_CPU", [self.cpu]).next()[0])
-                            mem = int(dockerfile.get("BUILD_MEM", [self.mem]).next()[0])
-
-                            if cpu <= offer_cpu and mem <= offer_mem:
-                                # Remove the task from the queue, we set this to None
-                                # to avoid changing the size of the list while looping
-                                self.queued_tasks[idx] = None
-                                self.pending -= 1
-                                self.running += 1
-                                tasks_to_launch.append((offer, offer_role, cpu, mem, dockerfile, build_task))
-                                logger.info("Launching build task %s with offer from %s", build_task.task_id, offer.hostname)
-                                break  # TODO: Don't currently support launching multiple tasks in a single offer
-                        else:
-                            logger.debug("Ignoring offer %r", offer)
-                            driver.declineOffer(offer.id)
-
-                        # Remove all of the tasks that are about to be launched
-                        self.queued_tasks = filter(None, self.queued_tasks)
-
-        # Launch the build tasks on the mesos cluster
-        # We do this outside of the _processing_offers lock because if there are
-        # any tasks, we've already taken them off the queue to be launched.
-        for offer, role, cpu, mem, dockerfile, build_task in tasks_to_launch:
-            try:
-                tasks = [self._prepare_task(
-                    driver=driver,
-                    dockerfile=dockerfile,
-                    build_task=build_task,
-                    offer=offer,
-                    cpu=cpu,
-                    mem=mem,
-                    role=role
-                )]
-            except Exception, e:
-                logger.error("Caught exception: %s", e.message)
-                self.failed += 1
-                self.running -= 1
-                tasks = []
-
-            if tasks:
-                driver.launchTasks([offer.id], tasks)
-            else:
-                driver.declineOffer(offer.id)
-
-    def status_update(self, driver, update):
-        """Called when a status update is received from the mesos cluster."""
-
-        finished = False
-        failed = False
-        task_id = update.task_id.value
-
-        if update.task_id.value not in self.task_history:
-            logger.error("Task update for unknown task! %s", task_id)
-            return
-
-        if update.state == mesos_pb2.TASK_STARTING:
-            logger.info("Task update %s : STARTING", task_id)
-        if update.state == mesos_pb2.TASK_RUNNING:
-            logger.info("Task update %s : RUNNING", task_id)
-        if update.state == mesos_pb2.TASK_FAILED:
-            logger.info("Task update %s : FAILED", task_id)
-            if update.message and update.data:
-                logger.info("Exception caught while building image: \n\n%s", update.data)
-            failed = True
-        elif update.state == mesos_pb2.TASK_FINISHED:
-            logger.info("Task update %s : FINISHED", task_id)
-            finished = True
-        elif update.state == mesos_pb2.TASK_KILLED:
-            logger.info("Task update %s : KILLED", task_id)
-            failed = True
-        elif update.state == mesos_pb2.TASK_LOST:
-            logger.info("Task update %s : LOST", task_id)
-            failed = True
-
-        # Update the last known status of the task
-        last_known_state = self.task_status[task_id]
-        self.task_status[task_id] = update.state
-
-        if finished:
-            self.cleanup.schedule_cleanup(task_id)
-
-            self.running -= 1
-            self.finished += 1
-        elif failed:
-            self.running -= 1
-
-            # Re-queue the task if it hasn't started RUNNING yet
-            if last_known_state in {None, mesos_pb2.TASK_STARTING, mesos_pb2.TASK_STAGING} and \
-               self.task_retries[task_id] < self.max_retries:
-                    self._reschedule_task(task_id, blacklist_slave=update.slave_id.value)
-            else:
-                self.failed += 1
-                self.cleanup.schedule_cleanup(task_id)
-
-        # If there are no tasks running, and the queue is empty, we should stop
-        if self.running == 0 and self.pending == 0:
-            driver.stop()
-
-    def framework_message(self, driver, executorId, slaveId, message):
-        message = message.decode('unicode-escape')
-        if "Buffering" in message:  # Heh. This'll do for now, eh?
-            logger.debug("\t%s", message)
-        else:
-            logger.info("\t%s", message)
-
-    def _reschedule_task(self, task_id, blacklist_slave=None):
-        if task_id not in self.task_history:
-            logger.error("Cannot re-schedule unknown task %s", task_id)
-            return
-
-        with self._processing_queue:
-            del self.task_status[task_id]
-
-            self.pending += 1
-            self.task_retries[task_id] += 1
-
-            if blacklist_slave:
-                self.blacklist.add(blacklist_slave)
-
-            self.queued_tasks.append(self.task_history[task_id])
-            logger.info("Re-scheduling task [%d] %s, excluding slave %s",
-                        self.task_retries[task_id], task_id, blacklist_slave)
-
-    def _prepare_task(self, driver, dockerfile, build_task, offer, cpu, mem, role):
-
-        # Define the mesos task
-        task = mesos_pb2.TaskInfo()
-        task.name = "%s/%s" % (":".join([build_task.image.registry.hostname, str(build_task.image.registry.port)]), build_task.image.repository)
-        task.task_id.value = build_task.task_id
-        task.slave_id.value = offer.slave_id.value
-
-        # Create the executor
-        args = []
-        if self.verbose:
-            args.append("--verbose")
-
-        task.executor.executor_id.value = build_task.task_id
-        task.executor.command.value = "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor" % (
-            os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args)
-        )
-
-        if self.container_image:
-            task.executor.container.type = mesos_pb2.ContainerInfo.DOCKER
-            task.executor.container.docker.image = self.container_image
-            task.executor.container.docker.privileged = True
-
-        task.executor.name = "build"
-        task.executor.source = "build %s" % (task.name)
-
-        # Configure the mesos executor with the portainer executor uri
-        portainer_executor = task.executor.command.uris.add()
-        portainer_executor.value = self.executor_uri
-
-        if build_task.context:
-            # Add the docker context
-            uri = task.executor.command.uris.add()
-            uri.value = build_task.context_url
-            uri.extract = False
-
-        task.data = build_task.SerializeToString()
-        task.executor.data = task.data
-
-        # Build up the resources we require
-        cpu_resource = task.resources.add()
-        cpu_resource.name = "cpus"
-        cpu_resource.type = mesos_pb2.Value.SCALAR
-        cpu_resource.role = role
-        cpu_resource.scalar.value = cpu
-
-        mem_resource = task.resources.add()
-        mem_resource.name = "mem"
-        mem_resource.type = mesos_pb2.Value.SCALAR
-        mem_resource.role = role
-        mem_resource.scalar.value = mem
-
-        self.task_history[build_task.task_id] = (dockerfile, build_task)
-
-        return task
-
     def _make_build_context(self, output, context_root, dockerfile):
         """Generate and return a compressed tar archive of the build context."""
 
@@ -485,30 +243,269 @@ class Scheduler(mesos.interface.Scheduler):
 
                 dockerfile.instructions[idx] = (cmd, (tar_path, remote_path))
 
-        # Write the modified dockerfile into the tar also
-        buildfile = StringIO.StringIO()
-        buildfile.write("# Generated by portainer\n")
+    def statusUpdate(self, driver, status):
+        """Called when a status update is received from the mesos cluster."""
 
-        for cmd, instructions in dockerfile.instructions:
-            if cmd not in dockerfile.INTERNAL:
-                line = "%s %s" % (cmd, " ".join(instructions))
+        finished = False
+        failed = False
+        task_id = status['task_id']['value']
 
-                logger.debug("Adding instruction %r to dockerfile", line)
-                buildfile.write("%s\n" % line)
+        if status['task_id']['value'] not in self.task_history:
+            logger.error("Task update for unknown task! %s", task_id)
+            return
 
-        buildfile.seek(0, os.SEEK_END)
-        info = tarfile.TarInfo("Dockerfile")
-        info.size = buildfile.tell()
+        if status['state'] == 'TASK_STARTING':
+            logger.info("Task update %s : STARTING", task_id)
+        if status['state'] == 'TASK_RUNNING':
+            logger.info("Task update %s : RUNNING", task_id)
+        if status['state'] == 'TASK_FAILED':
+            logger.info("Task update %s : FAILED", task_id)
+            if status['message'] and status.get('data'):
+                logger.info("Exception caught while building image: \n\n%s", base64.b64decode(status['data']))
+            elif status['message']:
+                logger.info("Failure while building image: \n\n%s", status['message'])
+            failed = True
+        elif status['state'] == 'TASK_FINISHED':
+            logger.info("Task update %s : FINISHED", task_id)
+            finished = True
+        elif status['state'] == 'TASK_KILLED':
+            logger.info("Task update %s : KILLED", task_id)
+            failed = True
+        elif status['state'] == 'TASK_LOST':
+            logger.info("Task update %s : LOST", task_id)
+            failed = True
 
-        buildfile.seek(0)
-        tar.addfile(info, fileobj=buildfile)
+        # Update the last known status of the task
+        last_known_state = self.task_status[task_id]
+        self.task_status[task_id] = status['state']
 
-        tar.close()
-        output.seek(0, os.SEEK_END)
-        tar_size = output.tell()
-        output.seek(0)
+        if finished:
+            self.cleanup.schedule_cleanup(task_id)
 
-        return tar_size
+            self.running -= 1
+            self.finished += 1
+        elif failed:
+            self.running -= 1
+
+            # Re-queue the task if it hasn't started RUNNING yet
+            if last_known_state in {None, 'TASK_STARTING', 'TASK_STAGING'} and \
+                            self.task_retries[task_id] < self.max_retries:
+                self._reschedule_task(task_id, blacklist_slave=status['agent_id']['value'])
+            else:
+                self.failed += 1
+                self.cleanup.schedule_cleanup(task_id)
+
+        # If there are no tasks running, and the queue is empty, we should stop
+        if self.running == 0 and self.pending == 0:
+            driver.stop()
+
+    def _reschedule_task(self, task_id, blacklist_slave=None):
+        if task_id not in self.task_history:
+            logger.error("Cannot re-schedule unknown task %s", task_id)
+            return
+
+        with self._processing_queue:
+            del self.task_status[task_id]
+
+            self.pending += 1
+            self.task_retries[task_id] += 1
+
+            if blacklist_slave:
+                self.blacklist.add(blacklist_slave)
+
+            self.queued_tasks.append(self.task_history[task_id])
+            logger.info("Re-scheduling task [%d] %s, excluding slave %s",
+                        self.task_retries[task_id], task_id, blacklist_slave)
+
+    def registered(self, driver, frameworkId, masterInfo):
+        host = masterInfo['hostname'] or masterInfo['ip']
+        master = "http://%s:%s" % (host, masterInfo['port'])
+        logger.info("Framework %s registered to %s", frameworkId['value'], master)
+
+    def disconnected(self, driver):
+        logger.warning("Framework disconnected from the mesos master")
+
+    def reregistered(self, driver, masterInfo):
+        host = masterInfo['hostname'] or masterInfo['ip']
+        master = "http://%s:%s" % (host, masterInfo['port'])
+        logger.info("Framework re-registered to %s", master)
+
+    def error(self, driver, message):
+        logger.error("Framework error: %s", message)
+
+    def frameworkMessage(self, driver, executorId, slaveId, message):
+        message = base64.b64decode(message)
+        if "Buffering" in message:  # Heh. This'll do for now, eh?
+            logger.debug("\t%s", message)
+        else:
+            logger.info("\t%s", message)
+
+    def resourceOffers(self, driver, offers):
+        # Spawn another thread to handle offer processing to free up the driver
+        t = threading.Thread(target=partial(
+            self._handle_offers,
+            driver,
+            offers
+        ))
+
+        t.setDaemon(True)
+        t.start()
+
+    def _handle_offers(self, driver, offers):
+
+        # We only want to process offers one set at a time
+        with self._processing_offers:
+            tasks_to_launch = []
+
+            if not self.pending:
+                driver.declineOffer([offer['id'] for offer in offers])
+            else:
+                for offer in offers:
+                    offer_cpu = 0.0
+                    offer_mem = 0
+                    offer_role = None
+
+                    # Extract the important resources from the offer
+                    for resource in offer['resources']:
+                        offer_role = resource['role']
+                        if resource['name'] == "cpus":
+                            offer_cpu = float(resource['scalar']['value'])
+                        if resource['name'] == "mem":
+                            offer_mem = int(resource['scalar']['value'])
+
+                    logger.debug("Received offer for cpus:%f mem:%d role:%s", offer_cpu, offer_mem, offer_role)
+
+                    # Look for a task in the queue that fits the bill
+                    with self._processing_queue:
+                        if offer['agent_id']['value'] in self.blacklist:
+                            logger.info("Ignoring offer from blacklisted agent %s", offer['agent_id']['value'])
+                            driver.declineOffer(offer['id'])
+                            continue
+
+                        for idx, (dockerfile, build_task) in enumerate(self.queued_tasks):
+                            cpu = float(dockerfile.get("BUILD_CPU", [self.cpu]).next()[0])
+                            mem = int(dockerfile.get("BUILD_MEM", [self.mem]).next()[0])
+
+                            if cpu <= offer_cpu and mem <= offer_mem:
+                                # Remove the task from the queue, we set this to None
+                                # to avoid changing the size of the list while looping
+                                self.queued_tasks[idx] = None
+                                self.pending -= 1
+                                self.running += 1
+                                tasks_to_launch.append((offer, offer_role, cpu, mem, dockerfile, build_task))
+                                logger.info("Launching build task %s with offer from %s", build_task.task_id, offer['hostname'])
+                                break  # TODO: Don't currently support launching multiple tasks in a single offer
+                        else:
+                            logger.debug("Ignoring offer %r", offer)
+                            driver.declineOffer(offer['id'])
+
+                        # Remove all of the tasks that are about to be launched
+                        self.queued_tasks = filter(None, self.queued_tasks)
+
+        # Launch the build tasks on the mesos cluster
+        # We do this outside of the _processing_offers lock because if there are
+        # any tasks, we've already taken them off the queue to be launched.
+        for offer, role, cpu, mem, dockerfile, build_task in tasks_to_launch:
+            try:
+                tasks = [self._prepare_task(
+                    driver=driver,
+                    dockerfile=dockerfile,
+                    build_task=build_task,
+                    offer=offer,
+                    cpu=cpu,
+                    mem=mem,
+                    role=role
+                )]
+            except Exception, e:
+                logger.error("Caught exception: %s", e.message)
+                self.failed += 1
+                self.running -= 1
+                tasks = []
+
+            if tasks:
+                driver.launchTasks([offer['id']], tasks)
+            else:
+                driver.declineOffer([offer['id']])
+
+    def _prepare_task(self, driver, dockerfile, build_task, offer, cpu, mem, role):
+
+        # Define the mesos task
+        task = {}
+        task['name'] = "%s/%s" % (":".join([build_task.image.registry.hostname, str(build_task.image.registry.port)]), build_task.image.repository)
+        task['task_id'] = {
+            'value': build_task.task_id
+        }
+        task['agent_id'] = {
+            'value': offer['agent_id']['value']
+        }
+
+        # Create the executor
+        args = []
+        if self.verbose:
+            args.append("--verbose")
+
+        task['executor'] = {}
+        task['executor']['executor_id'] = {
+            'value': build_task.task_id
+        }
+        task['executor']['command'] = {
+            'value': "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor"
+                     % (os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args))
+        }
+
+        if self.container_image:
+            # TODO This const is a guess currently
+            task['executor']['container'] = {}
+            task['executor']['container']['type'] = 'DOCKER'
+            task['executor']['container']['docker'] = {}
+            task['executor']['container']['docker']['image'] = self.container_image
+            task['executor']['container']['docker']['privileged'] = True
+
+        task['executor']['name'] = "build"
+        task['executor']['source'] = "build %s" % (task['name'])
+
+        # Configure the mesos executor with the portainer executor uri
+        task['executor']['command']['uris'] = [{
+            'value': self.executor_uri
+        }]
+
+        if build_task.context:
+            # Add the docker context
+            task['executor']['command']['uris'].append({
+                'value': build_task.context_url,
+                'extract': False
+            })
+
+        task['data'] = base64.b64encode(build_task.SerializeToString())
+        task['executor']['data'] = task['data']
+
+        # Build up the resources we require
+        cpu_resource = {
+            'name': "cpus",
+            'type': 'SCALAR',
+            'role': role,
+            'scalar': {
+                'value': cpu
+            }
+        }
+
+        mem_resource = {
+            'name': "mem",
+            'type': 'SCALAR',
+            'role': role,
+            'scalar': {
+                'value': mem
+            }
+        }
+
+        task['resources'] = [
+            cpu_resource,
+            mem_resource
+        ]
+
+        self.task_history[build_task.task_id] = (dockerfile, build_task)
+
+        return task
 
 
 class TaskCleanupThread(threading.Thread):

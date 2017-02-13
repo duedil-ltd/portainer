@@ -42,7 +42,7 @@ pushd $TMP_DIR > /dev/null
 
     echo "Fetching dependencies (fresh) to wheelhouse"
     # Use wheel to download, so that we get git-urls and non-pypi releases, all consistently bundled as wheels for pex
-    # to then load. Mo need to fetch dependencies, as pex will do it anyway (and do it better it seems)
+    # to then load. No need to fetch dependencies, as pex will do it anyway (and do it better it seems)
     mkdir wheelhouse
 
     pip wheel -q --no-deps -r $SOURCE_DIR/requirements.pip -w wheelhouse
@@ -54,7 +54,7 @@ pushd $TMP_DIR > /dev/null
     echo "Building pex"
     # Then feed them all to pex, using the wheelhouse as the cache dir. Provide a cache TTL to trick pex into using the
     # .whl files even though the req list entries are inexact
-    pex $reqs --wheel --repo=wheelhouse --cache-dir=wheelhouse --cache-ttl=9999 -i file://$SOURCE_DIR  -e portainer.app -o ./bin/portainer
+    pex $SOURCE_DIR $reqs --wheel --cache-dir=wheelhouse --cache-ttl=9999 -e portainer.app -o ./bin/portainer
 
     # if there's anything that looks like a non-pure-python wheel being used, mark the filename as platform-specific
     # check for wheels with names that aren't "..-py2..", "..-py2.py3.." etc -- ones with c deps for example are named "..-cp27.."

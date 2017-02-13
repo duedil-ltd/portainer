@@ -14,7 +14,7 @@ CODENAME=$(lsb_release -cs)
 echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" | \
   sudo tee /etc/apt/sources.list.d/mesosphere.list
 sudo apt-get -y update
-sudo apt-get -y install mesos=0.24.2-2.0.17.debian81
+sudo apt-get -y install mesos=1.1.0-2.0.107.debian81
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-master/ip"
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-slave/ip"
 sudo bash -c "echo docker,mesos > /etc/mesos-slave/containerizers"
@@ -48,6 +48,7 @@ sudo service mesos-slave start
 
 # Install portainer dependencies
 sudo apt-get install -y python-setuptools
+sudo apt-get install -y python-dev
 sudo easy_install pip
 sudo pip install virtualenv
 SCRIPT

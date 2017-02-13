@@ -4,7 +4,7 @@
 #
 
 FROM ubuntu:12.04
-MAINTAINER Tom Arnfeld <tom@duedil.com>
+MAINTAINER Oli Hall <oliver.hall@duedil.com>
 
 # Install dependencies
 RUN apt-get update && apt-get install -y build-essential git python-setuptools python-virtualenv

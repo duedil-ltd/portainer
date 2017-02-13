@@ -183,7 +183,7 @@ class Scheduler(pymesos.Scheduler):
             if len(registry) > 1:
                 build_task.image.registry.port = int(registry[1])
         except ValueError:
-            raise ValueError("Failed to parse REGISTRY in %s", path)
+            raise ValueError("Failed to parse REGISTRY in %s" % path)
 
         # Add any tags
         build_task.image.tag.extend(tags)

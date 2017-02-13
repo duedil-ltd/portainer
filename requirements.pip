@@ -1,4 +1,3 @@
-git+git://github.com/oli-hall/pesos.git@05adcb0621b51e2734322b7d8e4bc4104ceaef35#egg=pesos
 git+git://github.com/duedil-ltd/pyfilesystem.git@2b58f1359f50ecaf9ffea1e9ab3a88afb9f84d5e#egg=fs
 trollius==0.4
 protobuf>=2.6.1,<2.7
@@ -6,5 +5,4 @@ docker-py==0.4.0
 boto==2.27.0
 progressbar==2.2
 pywebhdfs==0.2.4
-mesos.interface==0.23.1
 pymesos==0.2.9

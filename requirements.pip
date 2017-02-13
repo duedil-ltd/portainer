@@ -7,3 +7,4 @@ boto==2.27.0
 progressbar==2.2
 pywebhdfs==0.2.4
 mesos.interface==0.23.1
+pymesos==0.2.9

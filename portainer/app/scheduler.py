@@ -444,30 +444,34 @@ class Scheduler(pymesos.Scheduler):
         if self.verbose:
             args.append("--verbose")
 
-        task['executor'] = {}
-        task['executor']['executor_id'] = {
-            'value': build_task.task_id
-        }
-        task['executor']['command'] = {
-            'value': "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor"
-                     % (os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args))
+        task['executor'] = {
+            'executor_id': {
+                'value': build_task.task_id
+            },
+            'command': {
+                'value': "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor"
+                         % (os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args))
+            }
         }
 
         if self.container_image:
-            # TODO This const is a guess currently
-            task['executor']['container'] = {}
-            task['executor']['container']['type'] = 'DOCKER'
-            task['executor']['container']['docker'] = {}
-            task['executor']['container']['docker']['image'] = self.container_image
-            task['executor']['container']['docker']['privileged'] = True
+            task['executor']['container'] = {
+                'type': 'DOCKER',
+                'docker': {
+                    'image': self.container_image,
+                    'privileged': True
+                }
+            }
 
         task['executor']['name'] = "build"
         task['executor']['source'] = "build %s" % (task['name'])
 
         # Configure the mesos executor with the portainer executor uri
-        task['executor']['command']['uris'] = [{
-            'value': self.executor_uri
-        }]
+        task['executor']['command']['uris'] = [
+            {
+                'value': self.executor_uri
+            }
+        ]
 
         if build_task.context:
             # Add the docker context

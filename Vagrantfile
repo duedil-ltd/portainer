@@ -42,7 +42,7 @@ sudo chmod +x /usr/bin/docker-1.7.0
 
 # Set up the docker registry
 sudo mkdir -p /registry
-sudo docker create -p 5000:5000 -v /registry:/tmp/registry-dev --name=registry registry:0.9.1
+sudo docker create -p 5000:5000 -v /registry:/tmp/registry-dev --name=registry registry:2
 (sudo docker start registry || true)
 
 # Start mesos

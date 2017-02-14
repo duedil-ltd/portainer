@@ -65,9 +65,8 @@ def main(args):
         'name': 'portainer'
     }
 
-    # TODO role not supported by pymesos
-    # if args.framework_role:
-    #     framework.role = args.framework_role
+    if args.framework_role:
+        framework['role'] = args.framework_role
 
     if args.framework_id:
         framework['id'] = {

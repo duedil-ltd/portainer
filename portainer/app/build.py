@@ -9,8 +9,10 @@ import time
 
 from portainer.app import subcommand
 from portainer.app.scheduler import Scheduler
+from portainer.util.parser import parse_dockerfile
 
 from pymesos import MesosSchedulerDriver
+
 
 logger = logging.getLogger("portainer.build")
 
@@ -59,10 +61,13 @@ def main(args):
         logger.error("The --repository argument cannot be used when building multiple images")
         sys.exit(1)
 
+    # TODO eliminate duplication of dockerfile parsing
+    dockerfiles = [parse_dockerfile(d, registry=args.pull_registry) for d in args.dockerfile]
+
     # Launch the mesos framework
     framework = {
         'user': getpass.getuser(),
-        'name': 'portainer'
+        'name': 'Portainer: building %s' % ', '.join([d.get("REPOSITORY").next()[0] for d in dockerfiles])
     }
 
     if args.framework_role:

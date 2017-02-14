@@ -72,7 +72,7 @@ class Executor(pymesos.Executor):
             # Use the `wrapdocker` script included in our docker image
             proc = subprocess.Popen(["/usr/local/bin/wrapdocker"], env=env)
 
-            self.docker = docker.Client()
+            self.docker = docker.APIClient()
             while True:
                 try:
                     self.docker.ping()
@@ -90,7 +90,7 @@ class Executor(pymesos.Executor):
             daemon_thread.setDaemon(True)
             daemon_thread.start()
         else:
-            self.docker = docker.Client(build_task.daemon.docker_host)
+            self.docker = docker.APIClient(base_url=build_task.daemon.docker_host)
             self.docker_daemon_up = True
 
     def reregistered(self, driver, slaveInfo):

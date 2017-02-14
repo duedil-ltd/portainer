@@ -1,7 +1,7 @@
 git+git://github.com/duedil-ltd/pyfilesystem.git@2b58f1359f50ecaf9ffea1e9ab3a88afb9f84d5e#egg=fs
 trollius==0.4
 protobuf>=2.6.1,<2.7
-docker-py==0.4.0
+docker==2.0.2
 boto==2.27.0
 progressbar==2.2
 pywebhdfs==0.2.4

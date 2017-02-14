@@ -20,6 +20,9 @@ sudo bash -c "echo 192.168.33.50 > /etc/mesos-slave/ip"
 sudo bash -c "echo docker,mesos > /etc/mesos-slave/containerizers"
 sudo bash -c "echo /usr/bin/docker-1.7.0 > /etc/mesos-slave/docker"
 
+# add local user as user on VM
+adduser $1
+
 # Start a bunch of services
 sudo service zookeeper restart
 sleep 5
@@ -70,5 +73,5 @@ Vagrant.configure("2") do |config|
   config.vm.provision :shell, :inline => "sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/Europe/London /etc/localtime", run: "always"
 
   # Install all the things!
-  config.vm.provision "shell", inline: $docker_setup
+  config.vm.provision "shell", inline: $docker_setup, args: ENV['USER']
 end

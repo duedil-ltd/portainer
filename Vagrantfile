@@ -55,7 +55,6 @@ SCRIPT
 
 Vagrant.configure("2") do |config|
 
-  # Use the same base box as vagrant-web
   config.vm.box = "puppetlabs/debian-8.2-64-nocm"
 
   config.vm.synced_folder "./", "/opt/portainer"

@@ -1,6 +1,6 @@
 
-FROM ubuntu:12.04
-MAINTAINER Tom Arnfeld <tom@duedil.com>
+FROM ubuntu:14.04
+MAINTAINER Oli Hall <oliver.hall@duedil.com>
 
 REPOSITORY portainer/tree-a
 

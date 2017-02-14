@@ -3,7 +3,7 @@
 # portainer source installed into /opt/portainer.
 #
 
-FROM ubuntu:12.04
+FROM ubuntu:14.04
 MAINTAINER Oli Hall <oliver.hall@duedil.com>
 
 # Install dependencies

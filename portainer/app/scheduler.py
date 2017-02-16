@@ -449,7 +449,7 @@ class Scheduler(pymesos.Scheduler):
                 'value': build_task.task_id
             },
             'command': {
-                'value': "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s build-executor"
+                'value': "${MESOS_SANDBOX:-${MESOS_DIRECTORY}}/%s/bin/portainer %s run-executor"
                          % (os.path.basename(self.executor_uri).rstrip(".tar.gz"), " ".join(args))
             }
         }

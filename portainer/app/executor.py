@@ -24,7 +24,7 @@ from portainer.proto import portainer_pb2
 logger = logging.getLogger("portainer.executor")
 
 
-@subcommand("build-executor")
+@subcommand("run-executor")
 def main(args):
     driver = pymesos.MesosExecutorDriver(Executor())
 

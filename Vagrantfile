@@ -10,15 +10,25 @@ sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF
 DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
 CODENAME=$(lsb_release -cs)
 
-# Add the repository
+# Add the Mesos/Docker repositories (Docker needs official GPG key adding first)
 echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" | \
   sudo tee /etc/apt/sources.list.d/mesosphere.list
 sudo apt-get -y update
+sudo apt-get install -y --no-install-recommends apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://apt.dockerproject.org/gpg | sudo apt-key add -
+echo "deb https://apt.dockerproject.org/repo/ debian-$CODENAME main" | \
+  sudo tee /etc/apt/sources.list.d/docker.list
+
+# Update package list and install Mesos/Docker
+sudo apt-get -y update
 sudo apt-get -y install mesos=1.1.0-2.0.107.debian81
+sudo apt-get -y install docker-engine=1.10.3-0~jessie
+
+# Set Mesos IP/containerizer/docker instance
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-master/ip"
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-slave/ip"
 sudo bash -c "echo docker,mesos > /etc/mesos-slave/containerizers"
-sudo bash -c "echo /usr/bin/docker-1.7.0 > /etc/mesos-slave/docker"
+sudo bash -c "echo /usr/bin/docker > /etc/mesos-slave/docker"
 
 # add local user as user on VM
 adduser $1
@@ -28,15 +38,6 @@ sudo service zookeeper restart
 sleep 5
 (sudo service mesos-master stop || true)
 (sudo service mesos-slave stop || true)
-
-# Install Docker
-curl -sSL https://get.docker.com/ | sh
-sudo usermod -a -G docker vagrant
-
-# Download a specific docker binary
-# TODO: Skip the above?
-sudo bash -c "curl -0 https://get.docker.com/builds/Linux/x86_64/docker-1.7.0 > /usr/bin/docker-1.7.0"
-sudo chmod +x /usr/bin/docker-1.7.0
 
 # Set up the docker registry
 sudo mkdir -p /registry
@@ -48,8 +49,7 @@ sudo service mesos-master start
 sudo service mesos-slave start
 
 # Install portainer dependencies
-sudo apt-get install -y python-setuptools
-sudo apt-get install -y python-dev
+sudo apt-get install -y python-setuptools python-dev
 sudo easy_install pip
 sudo pip install virtualenv
 SCRIPT

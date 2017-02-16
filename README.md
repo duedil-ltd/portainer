@@ -1,7 +1,7 @@
 
 # Portainer
 
-Portainer is an [Apache Mesos](https://mesos.apache.org) framework that enables you to build docker images across a cluster of many machines.
+Portainer is an [Apache Mesos](https://mesos.apache.org) framework that enables you to build Docker images across a cluster of many machines.
 
 ```
                    .,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.,.
@@ -23,7 +23,7 @@ Portainer is an [Apache Mesos](https://mesos.apache.org) framework that enables 
            ```````
 ```
 
-When building docker images at scale, it can be time consuming and wasteful to manage dedicated infrastructure for building and pushing images. Building large containers with many sources and dependencies is a heavy operation, sometimes requiring many large machines. Deploying this infrastructure can be expensive and often leads to poor utilization.
+When building Docker images at scale, it can be time consuming and wasteful to manage dedicated infrastructure for building and pushing images. Building large containers with many sources and dependencies is a heavy operation, sometimes requiring many large machines. Deploying this infrastructure can be expensive and often leads to poor utilization.
 
 Given an existing Apache Mesos cluster, Portainer can get to work right away. If you're new to Mesos, you can try out the Vagrant box provided, or learn more about the [Apache Mesos Architecture](https://mesos.apache.org/documentation/latest/mesos-architecture/) and [get started](https://mesos.apache.org/gettingstarted/).
 
@@ -41,8 +41,7 @@ See below for more documentation on how to use the Vagrant virtual machine.
 
 #### Notes
 
-- Pushing built images to the public docker index is currently not supported
-- Support for docker client ~>1.7.0 requires Apache Mesos >=0.23.0 ([MESOS-3279](https://issues.apache.org/jira/browse/MESOS-3279))
+- Pushing built images to the public Docker index is currently not supported
 
 --------------------------------------------------------------------------------
 
@@ -59,7 +58,7 @@ You'll need to have the following dependencies installed to run the framework.
 
 ### Mesos Agent Dependencies
 
-By default, Portainer will try and launch an ephemeral docker daemon (`docker -d`) on the mesos agent machine using [docker in docker](https://github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos agents. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the docker daemon can be accessed on each agent.
+By default, Portainer will try and launch an ephemeral Docker daemon (`docker -d`) on the mesos agent machine using [docker in docker](https://github.com/jpetazzo/dind). This requires that you're using a Docker Containerizer on your Mesos agents. If you are not, you'll need to specify the `--docker-host` argument (e.g `--docker-host /var/run/docker.sock`) describing where the Docker daemon can be accessed on each agent.
 
 ## Building an Image
 
@@ -69,13 +68,15 @@ By default, Portainer will try and launch an ephemeral docker daemon (`docker -d
 $ bin/build-executor
 ```
 
+This script uses PEX to package portainer's code into an executable to be run on Mesos.
+
 _Note: If you've got a dirty git tree, you'll need to set the `FORCE=1` environment variable._
 
 The built PEX (python executable) archive will be dumped into `./dist`, and needs to be uploaded somewhere Mesos can reach it (HDFS, S3, FTP, HTTP etc). Check the output from the build-executor command to see the file name, and upload the file.
 
 The environment name is tacked on to the archive filename, e.g. `dist/portainer-37cc6d5eb334473fdaa9c7522c4ce585032dca5c.linux-x86_64.tar.gz`. Make sure you build the executor on the same platform as your mesos slaves use.
 
-In future, readily-downloadable prebuild pex files will be available on versioned github releases.
+In future, readily-downloadable prebuilt pex files will be available on versioned github releases.
 
 #### 2. Grab a `Dockerfile`
 
@@ -120,7 +121,7 @@ The vagrant virtual environment provided will launch a VM will the following com
 
 ### 1. Start the VM
 
-To use the Vagrant box, run `vagrant box add debian-73-x64-virtualbox-nocm http://puppet-vagrant-boxes.puppetlabs.com/debian-73-x64-virtualbox-nocm.box` then `vagrant up` to set everything up.
+To use the Vagrant box, run `vagrant up` to set everything up. This will download a Debian 8 virtualmachine and install all the required processes/dependencies.
 
 ### 2. Test Mesos
 
@@ -128,7 +129,7 @@ The VM runs on a static IP `192.168.33.50` so before proceeding it's best to che
 
 ### 3. Build the executor
 
-To build the Portainer executor, simply run `bin/build-executor`.
+To build the Portainer executor, simply run `bin/build-executor` from the portainer root directory (`/opt/portainer`).
 
 _Note: If you've got a dirty git tree, you'll need to set the `FORCE=1` environment variable._
 

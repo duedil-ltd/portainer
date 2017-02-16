@@ -30,8 +30,6 @@ sleep 5
 (sudo service mesos-slave stop || true)
 
 # Install Docker
-sudo bash -c 'echo "deb http://http.debian.net/debian wheezy-backports main" > /etc/apt/sources.list.d/backports.list'
-sudo apt-get install -y linux-image-amd64
 curl -sSL https://get.docker.com/ | sh
 sudo usermod -a -G docker vagrant
 
@@ -63,7 +61,7 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder "./", "/opt/portainer"
   config.vm.network :private_network, ip: "192.168.33.50"
 
-  # Configure the VM with 1024Mb of RAM and 2 CPUs
+  # Configure the VM with 2048Mb of RAM and 2 CPUs
   config.vm.provider :virtualbox do |vb|
     vb.customize ["modifyvm", :id, "--memory", "2048"]
     vb.customize ["modifyvm", :id, "--cpus", "2"]

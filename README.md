@@ -41,7 +41,7 @@ See below for more documentation on how to use the Vagrant virtual machine.
 
 #### Notes
 
-- Pushing built images to the public Docker index is currently not supported
+- Pushing built images to the public Docker index is currently not supported.
 
 --------------------------------------------------------------------------------
 

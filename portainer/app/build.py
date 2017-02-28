@@ -1,4 +1,4 @@
-"""The entrypoint to the portainer app. Spins up the a scheduler instance and
+"""The entrypoint to the portainer app. Spins up a scheduler instance and
 waits for the result."""
 
 import getpass

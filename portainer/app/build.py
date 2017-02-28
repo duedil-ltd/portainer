@@ -1,16 +1,18 @@
-"""The entrypoint to the portainer app. Spins up the a schedular instance and
+"""The entrypoint to the portainer app. Spins up a scheduler instance and
 waits for the result."""
 
 import getpass
 import logging
-import pesos.scheduler
 import sys
 import threading
 import time
 
-from pesos.vendor.mesos import mesos_pb2
 from portainer.app import subcommand
 from portainer.app.scheduler import Scheduler
+from portainer.util.parser import parse_dockerfile
+
+from pymesos import MesosSchedulerDriver
+
 
 logger = logging.getLogger("portainer.build")
 
@@ -59,16 +61,22 @@ def main(args):
         logger.error("The --repository argument cannot be used when building multiple images")
         sys.exit(1)
 
+    # TODO eliminate duplication of dockerfile parsing
+    dockerfiles = [parse_dockerfile(d, registry=args.pull_registry) for d in args.dockerfile]
+
     # Launch the mesos framework
-    framework = mesos_pb2.FrameworkInfo()
-    framework.user = getpass.getuser()
-    framework.name = "portainer"
+    framework = {
+        'user': getpass.getuser(),
+        'name': 'Portainer: building %s' % ', '.join([d.get("REPOSITORY").next()[0] for d in dockerfiles])
+    }
 
     if args.framework_role:
-        framework.role = args.framework_role
+        framework['role'] = args.framework_role
 
     if args.framework_id:
-        framework.id.value = args.framework_id
+        framework['id'] = {
+            'value': args.framework_id
+        }
 
     if args.docker_host:
         args.container_image = None
@@ -89,11 +97,13 @@ def main(args):
         max_retries=args.retries
     )
 
-    driver = pesos.scheduler.PesosSchedulerDriver(
-        scheduler, framework, args.mesos_master
+    driver = MesosSchedulerDriver(
+        scheduler,
+        framework,
+        args.mesos_master
     )
 
-    # Kick off the pesos scheduler and watch the magic happen
+    # Kick off the pymesos scheduler and watch the magic happen
     thread = threading.Thread(target=driver.run)
     thread.setDaemon(True)
     thread.start()

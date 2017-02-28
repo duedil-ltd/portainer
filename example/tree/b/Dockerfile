@@ -1,6 +1,6 @@
 
 FROM portainer/tree-a
-MAINTAINER Tom Arnfeld <tom@duedil.com>
+MAINTAINER Oli Hall <oliver.hall@duedil.com>
 
 REPOSITORY portainer/tree-b
 

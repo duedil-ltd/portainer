@@ -3,8 +3,8 @@
 # portainer source installed into /opt/portainer.
 #
 
-FROM ubuntu:12.04
-MAINTAINER Tom Arnfeld <tom@duedil.com>
+FROM ubuntu:14.04
+MAINTAINER Oli Hall <oliver.hall@duedil.com>
 
 # Install dependencies
 RUN apt-get update && apt-get install -y build-essential git python-setuptools python-virtualenv
